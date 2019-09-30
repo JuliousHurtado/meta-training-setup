@@ -45,7 +45,7 @@ class DataLoader(object):
 
         with open(path, 'r') as f:
             for row in f.readlines():
-                img_id, variant = row.split(' ', 1)
+                img_id, variant = row.strip().split(' ', 1)
                 if variant in self.classes:
                     img_names.append(os.path.join(self.path_data,'data','images',img_id+'.jpg'))
                     img_target.append(self.classes.index(variant))
@@ -81,11 +81,12 @@ class DataLoader(object):
         img_target = []
 
         for cl in os.listdir(os.path.join(self.path_data, 'images')):
-            c = cl.replace("'", "").replace('_','.',1).replace('_',' ')
-            if c in self.classes:
+            c = cl.replace("'", "").split('_',1)[1].replace('_',' ')
+            index_list = [ c in elem for elem in self.classes]
+            if True in index_list:
                 for img in os.listdir(os.path.join(self.path_data, 'images', cl)):
                     img_names.append(os.path.join(self.path_data, 'images', cl, img))
-                    img_target.append(self.classes.index(c))
+                    img_target.append(index_list.index(True))
 
         return img_names, img_target
 
@@ -134,10 +135,12 @@ class DataLoader(object):
 def main():
     path = '/mnt/nas/GrimaRepo/datasets/'
 
-    datasets = ['aircraft', 'cu_birds', 'dtd', 'fungi', 'quickdraw', 'traffic_sign', 'vgg_flower']
+    datasets = ['aircraft', 'cu_birds', 'dtd', 'fungi', 'traffic_sign', 'vgg_flower']
 
     for elem in datasets:
+        print(elem)
         for split in ['train', 'valid', 'test']:
+            print(split)
             temp = DataLoader(path, elem, os.path.join('data', elem+'_splits.json'), split)
             print(len(temp))
 
