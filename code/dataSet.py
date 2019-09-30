@@ -2,19 +2,6 @@ import json
 import os
 import scipy.io
 
-#Me faltan ImageNet y omniglot
-datasets ={
-    'aircraft': ['fgvc-aircraft-2013b', readAircraft()]
-    'cu_birds': ['CUB_200_2011',readCUB()],
-    'dtd': ['dtd',readDTD()],
-    'fungi': ['fungi',readFungi()],
-    'quickdraw': ['quickdraw',readQuickdraw()],
-    'traffic_sign': ['traffic_sign',readTraffic()],
-    'vgg_flower': ['VGGFlower',readVGGFlower()],
-    #'mscoco': 'mscoco'
-}
-
-
 """
 Solo para pruebas de concepto
 Entrenar con aircraft, CUB, dtd, fungi, vgg_flower
@@ -23,6 +10,17 @@ Test con traffic
 
 class DataLoader(object):
     def __init__(self, path, dataset, path_split, split):
+        #Me faltan ImageNet y omniglot
+        datasets ={
+            'aircraft': ['fgvc-aircraft-2013b', self.readAircraft],
+            'cu_birds': ['CUB_200_2011', self.readCUB],
+            'dtd': ['dtd', self.readDTD],
+            'fungi': ['fungi', self.readFungi],
+            'quickdraw': ['quickdraw', self.readQuickdraw],
+            'traffic_sign': ['traffic_sign', self.readTraffic],
+            'vgg_flower': ['VGGFlower', self.readVGGFlower],
+            #'mscoco': 'mscoco'
+        }
 
         self.path_data = os.path.join(path, datasets[dataset][0])
         self.path_split = path_split
@@ -31,7 +29,7 @@ class DataLoader(object):
 
         self.classes = self.readJson()
 
-        self.data, self.target = datasets[dataset][1]
+        self.data, self.target = datasets[dataset][1]()
 
     def readJson(self):
         with open(self.path_split, 'r') as f:
@@ -136,9 +134,11 @@ class DataLoader(object):
 def main():
     path = '/mnt/nas/GrimaRepo/datasets/'
 
+    datasets = ['aircraft', 'cu_birds', 'dtd', 'fungi', 'quickdraw', 'traffic_sign', 'vgg_flower']
+
     for elem in datasets:
         for split in ['train', 'valid', 'test']:
-            temp = DataLoader(path, elem, os.path.join(data, elem+'_splits.json'))
+            temp = DataLoader(path, elem, os.path.join('data', elem+'_splits.json'), split)
             print(len(temp))
 
 if __name__ == '__main__':
