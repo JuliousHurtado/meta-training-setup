@@ -10,6 +10,8 @@ from torch import optim
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
+from data.datasets.full_omniglot import FullOmniglot
+
 from copy import deepcopy
 
 import learn2learn as l2l
@@ -44,12 +46,16 @@ def getDatasets(dataset, ways):
     generators = {'train': None, 'validation': None, 'test': None}
     if dataset == 'mini-imagenet':
         for mode, tasks in zip(['train','validation','test'], tasks_list):
-            dataset = l2l.vision.datasets.MiniImagenet(root='./data/data', mode=mode)
-            print(dataset[14])
+            dataset = l2l.vision.datasets.MiniImagenet(root='./data/data', mode=mode, 
+                                transform = transforms.Compose([
+                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                ]))
+            print(dataset[14][0].size())
+            print(dataset[14][0].sum())
             dataset = l2l.data.MetaDataset(dataset)
             generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
     else:
-        omniglot = l2l.vision.datasets.FullOmniglot(root='./data/data',
+        omniglot = FullOmniglot(root='./data/data',
                                                 transform=transforms.Compose([
                                                     l2l.vision.transforms.RandomDiscreteRotation(
                                                         [0.0, 90.0, 180.0, 270.0]),
@@ -57,8 +63,9 @@ def getDatasets(dataset, ways):
                                                     transforms.ToTensor(),
                                                     lambda x: 1.0 - x,
                                                 ]),
-                                                download=True)
-        print(omniglot[12])
+                                                download=False, to_color = True)
+        print(omniglot[12][0].size())
+        print(omniglot[12][0].sum())
         omniglot = l2l.data.MetaDataset(omniglot)
         classes = list(range(1623))
         random.shuffle(classes)
