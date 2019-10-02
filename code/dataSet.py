@@ -1,6 +1,7 @@
 import json
 import os
 import scipy.io
+from PIL import Image
 
 """
 Solo para pruebas de concepto
@@ -9,7 +10,7 @@ Test con traffic
 """
 
 class DataLoader(object):
-    def __init__(self, path, dataset, path_split, split):
+    def __init__(self, path, dataset, path_split, split, transform = None):
         #Me faltan ImageNet y omniglot
         datasets ={
             'aircraft': ['fgvc-aircraft-2013b', self.readAircraft],
@@ -26,6 +27,7 @@ class DataLoader(object):
         self.path_split = path_split
 
         self.split = split
+        self.transform = transform
 
         self.classes = self.readJson()
 
@@ -129,6 +131,23 @@ class DataLoader(object):
 
         return img_names, img_target
 
+    def loader(self, path):
+        # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+        with open(path, 'rb') as f:
+            img = Image.open(f)
+            return img.convert('RGB')
+
+    def __getitem__(self, index):
+        path, target = self.data[index], self.target[index]
+
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
+
     def __len__(self):
         return len(self.data)
 
@@ -141,8 +160,13 @@ def main():
         print(elem)
         for split in ['train', 'valid', 'test']:
             print(split)
-            temp = DataLoader(path, elem, os.path.join('data', elem+'_splits.json'), split)
-            print(len(temp))
+            dataset = DataLoader(path, elem, os.path.join('data/splits', elem+'_splits.json'), split)
+
+            loader = torch.utils.data.DataLoader(
+                            dataset, batch_size=64, shuffle=False)
+            
+            for elem in loader:
+                print(elem[0].size())
 
 if __name__ == '__main__':
     main()
