@@ -10,7 +10,7 @@ from torch import optim
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
-from data.datasets.full_omniglot import FullOmniglot
+from data.datasets import full_omniglot
 
 from copy import deepcopy
 
@@ -55,7 +55,7 @@ def getDatasets(dataset, ways):
             dataset = l2l.data.MetaDataset(dataset)
             generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
     else:
-        omniglot = FullOmniglot(root='./data/data',
+        omniglot = full_omniglot.FullOmniglot(root='./data/data',
                                                 transform=transforms.Compose([
                                                     l2l.vision.transforms.RandomDiscreteRotation(
                                                         [0.0, 90.0, 180.0, 270.0]),

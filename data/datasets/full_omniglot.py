@@ -4,6 +4,7 @@
 from torch.utils.data import Dataset, ConcatDataset
 from torchvision.datasets.omniglot import Omniglot
 
+import numpy as np
 
 class FullOmniglot(Dataset):
     """
@@ -70,10 +71,10 @@ class FullOmniglot(Dataset):
 
         return image, character_class
 
-    def toColor(self):
+    def toColor(self, img):
         # We make the assumption that the images are square.
-        side = int(np.sqrt(img.shape[0]))
+        #side = int(np.sqrt(img.shape[0]))
         # To load an array as a PIL.Image we must first reshape it to 2D.
-        img = Image.fromarray(img.reshape((side, side)))
+        # img = Image.fromarray(img.reshape((side, side)))
         img = img.convert('RGB')
         return img
