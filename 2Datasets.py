@@ -30,8 +30,6 @@ def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps
         X = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(device)
         # X = th.cat([d[0] for d in data], dim=0).to(device)
         y = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(device)
-        print(X.size())
-        print(y.size())
         train_error = loss(learner(X), y)
         train_error /= len(adaptation_data)
         learner.adapt(train_error)
@@ -86,14 +84,20 @@ def getDatasets(dataset, ways):
 
     return generators['train'], generators['validation'], generators['test']
 
+def saveValues(name_file, acc, loss):
+    torch.save({
+            'acc': acc,
+            'loss': loss,
+            }, name_file)
+
 def main(
         ways=5,
         shots=1,
         meta_lr=0.003,
         fast_lr=0.5,
-        meta_batch_size=4,
+        meta_batch_size=32,
         adaptation_steps=1,
-        num_iterations=6,
+        num_iterations=60000,
         cuda=True,
         seed=42,
 ):
@@ -202,6 +206,8 @@ def main(
             for p in maml.parameters():
                 p.grad.data.mul_(1.0 / meta_batch_size)
             opt.step()
+
+    saveValues('results/2datasets.pth',results['test_acc'],results['test_loss'])
 
 if __name__ == '__main__':
     main()
