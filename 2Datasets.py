@@ -30,6 +30,8 @@ def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps
         X = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(device)
         # X = th.cat([d[0] for d in data], dim=0).to(device)
         y = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(device)
+        print(X.size())
+        print(y.size())
         train_error = loss(learner(X), y)
         train_error /= len(adaptation_data)
         learner.adapt(train_error)
@@ -145,8 +147,7 @@ def main(
                                                                    evaluation_data,
                                                                    learner,
                                                                    loss,
-                                                                   adaptation_steps,
-                                                                   device)
+                                                                   adaptation_steps)
                 evaluation_error.backward()
                 meta_train_error += evaluation_error.item()
                 meta_train_accuracy += evaluation_accuracy.item()
@@ -160,8 +161,7 @@ def main(
                                                                    evaluation_data,
                                                                    learner,
                                                                    loss,
-                                                                   adaptation_steps,
-                                                                   device)
+                                                                   adaptation_steps)
                 meta_valid_error += evaluation_error.item()
                 meta_valid_accuracy += evaluation_accuracy.item()
 
@@ -178,8 +178,7 @@ def main(
                                                                        evaluation_data,
                                                                        learner,
                                                                        loss,
-                                                                       adaptation_steps,
-                                                                       device)
+                                                                       adaptation_steps)
                 err.append(evaluation_error.item())
                 acc.append(evaluation_accuracy.item())
 
