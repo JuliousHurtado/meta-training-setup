@@ -11,12 +11,13 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
 from data.datasets.full_omniglot import FullOmniglot
+from model.omniglot_cnn import OmniglotCNN
 
 from copy import deepcopy
 
 import learn2learn as l2l
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = th.device("cpu" if th.cuda.is_available() else "cpu")
 
 def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
@@ -107,7 +108,7 @@ def main(
     generators['omniglot'] = getDatasets('omniglot', ways)
     
     # Create model
-    model = l2l.vision.models.OmniglotCNN(ways)
+    model = OmniglotCNN(ways)
     model.to(device)
     maml = l2l.algorithms.MAML(model, lr=fast_lr, first_order=False)
     opt = optim.Adam(maml.parameters(), meta_lr)
