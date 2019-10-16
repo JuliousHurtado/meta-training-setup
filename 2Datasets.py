@@ -1,6 +1,7 @@
 import os
 import random
 import argparse
+import time
 
 import numpy as np
 import torch as th
@@ -41,6 +42,17 @@ def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps
     valid_error /= len(evaluation_data)
     valid_accuracy = accuracy(predictions, y)
     return valid_error, valid_accuracy
+
+def adaptationProcess(args, generator, learner, loss):
+    adaptation_data = generator.sample(shots=args['shots'])
+    evaluation_data = generator.sample(shots=args['shots'],task=adaptation_data.sampled_task)
+
+    evaluation_error, evaluation_accuracy = fast_adapt(adaptation_data,
+                                                                   evaluation_data,
+                                                                   learner,
+                                                                   loss,
+                                                                   args['adaptation_steps'])
+    return evaluation_error, evaluation_accuracy
 
 def getDatasets(dataset, ways):
     tasks_list = [20000, 1024, 1024]
@@ -92,9 +104,14 @@ def saveValues(name_file, acc, loss, args):
 
 def getMetaAlgorithm(args, model):
     if args['algorithm'] == 'maml':
-        meta_model = MAML(model, lr=args['fast_lr'], first_order=args['first_order'])
+        meta_model = MAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
+                                device = device,
+                                first_order=args['first_order'])
     elif args['algorithm'] == 'meta-sgd':
-        meta_model = MetaSGD(model, lr=args['fast_lr'], first_order=args['first_order'])
+        meta_model = MetaSGD(model, adaptation_steps = args['adaptation_steps'], 
+                                device = device,
+                                lr=args['fast_lr'], 
+                                first_order=args['first_order'])
     else:
         meta_model = model
 
@@ -140,28 +157,16 @@ def main(args):
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
                 learner = meta_model.clone()
-                adaptation_data = train_generator.sample(shots=args['shots'])
-                evaluation_data = train_generator.sample(shots=args['shots'],
-                                                         task=adaptation_data.sampled_task)
-                evaluation_error, evaluation_accuracy = fast_adapt(adaptation_data,
-                                                                   evaluation_data,
-                                                                   learner,
-                                                                   loss,
-                                                                   args['adaptation_steps'])
+                evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
+
                 evaluation_error.backward()
                 meta_train_error += evaluation_error.item()
                 meta_train_accuracy += evaluation_accuracy.item()
 
                 # Compute meta-validation loss
                 learner = meta_model.clone()
-                adaptation_data = valid_generator.sample(shots=args['shots'])
-                evaluation_data = valid_generator.sample(shots=args['shots'],
-                                                         task=adaptation_data.sampled_task)
-                evaluation_error, evaluation_accuracy = fast_adapt(adaptation_data,
-                                                                   evaluation_data,
-                                                                   learner,
-                                                                   loss,
-                                                                   args['adaptation_steps'])
+                evaluation_error, evaluation_accuracy = adaptationProcess(args, valid_generator, learner, loss)
+
                 meta_valid_error += evaluation_error.item()
                 meta_valid_accuracy += evaluation_accuracy.item()
 
@@ -171,14 +176,8 @@ def main(args):
                 test_generator = generators[dataset2][2]
                 # Compute meta-testing loss
                 learner = meta_model.clone()
-                adaptation_data = test_generator.sample(shots=args['shots'])
-                evaluation_data = test_generator.sample(shots=args['shots'],
-                                                            task=adaptation_data.sampled_task)
-                evaluation_error, evaluation_accuracy = fast_adapt(adaptation_data,
-                                                                       evaluation_data,
-                                                                       learner,
-                                                                       loss,
-                                                                       args['adaptation_steps'])
+                evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+
                 err.append(evaluation_error.item())
                 acc.append(evaluation_accuracy.item())
 
@@ -203,7 +202,7 @@ def main(args):
                 p.grad.data.mul_(1.0 / args['meta_batch_size'])
             opt.step()
 
-    file_path = 'results/2datasets_{}_{}_{}_{}.pth'.format(args['algorithm'], args['shots'], args['ways'], args['first_order'])
+    file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], args['shots'], args['ways'], args['first_order'])
     saveValues(file_path,results['test_acc'],results['test_loss'], args)
 
 def str2bool(v):
@@ -233,7 +232,7 @@ if __name__ == '__main__':
 
     # ProtoNet
     parser.add_argument('--distance', default='l2')
-    args = parser.parse_args()
+    args = vars(parser.parse_args())
 
     random.seed(args['seed'])
     np.random.seed(args['seed'])

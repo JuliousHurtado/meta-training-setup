@@ -82,11 +82,13 @@ class MAML(BaseLearner):
     ~~~
     """
 
-    def __init__(self, model, lr, first_order=False):
+    def __init__(self, model, lr, adaptation_steps = 1, device = 'cpu', first_order=False):
         super(MAML, self).__init__()
         self.module = model
         self.lr = lr
         self.first_order = first_order
+        self.adaptation_steps = adaptation_steps
+        self.device = device
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
