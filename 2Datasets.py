@@ -5,6 +5,7 @@ import numpy as np
 import torch as th
 from PIL.Image import LANCZOS
 
+import torch
 from torch import nn
 from torch import optim
 from torchvision import transforms
@@ -17,7 +18,7 @@ from copy import deepcopy
 
 import learn2learn as l2l
 
-device = th.device("cpu" if th.cuda.is_available() else "cpu")
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
@@ -92,12 +93,12 @@ def saveValues(name_file, acc, loss):
 
 def main(
         ways=5,
-        shots=1,
+        shots=5,
         meta_lr=0.003,
         fast_lr=0.5,
         meta_batch_size=32,
-        adaptation_steps=1,
-        num_iterations=60000,
+        adaptation_steps=5,
+        num_iterations=6000,
         cuda=True,
         seed=42,
 ):
