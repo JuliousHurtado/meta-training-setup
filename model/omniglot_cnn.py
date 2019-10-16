@@ -112,3 +112,6 @@ class OmniglotCNN(nn.Module):
         x = self.base(x)
         x = self.linear(x.view(-1, 25 * self.hidden_size))
         return x
+
+    def clone(self):
+        return self
