@@ -95,10 +95,9 @@ def getDatasets(dataset, ways):
 
     return generators['train'], generators['validation'], generators['test']
 
-def saveValues(name_file, acc, loss, args):
+def saveValues(name_file, results, args):
     th.save({
-            'acc': acc,
-            'loss': loss,
+            'results': results,
             'args': args
             }, name_file)
 
@@ -142,7 +141,7 @@ def main(args):
         'test_loss': [],
 
     }
-    for dataset in ['omniglot']: #'mini-imagenet', 
+    for dataset in ['mini-imagenet','omniglot']: # 
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
@@ -182,15 +181,18 @@ def main(args):
                 acc.append(evaluation_accuracy.item())
 
             # Print some metrics
-            print('\n')
-            print('Iteration', iteration)
-            print('Meta Train Error', meta_train_error / args['meta_batch_size'])
-            print('Meta Train Accuracy', meta_train_accuracy / args['meta_batch_size'])
+            if iteration % 50 == 0:
+                print('\n')
+                print('Iteration', iteration)
+                print('Meta Train Error', meta_train_error / args['meta_batch_size'])
+                print('Meta Train Accuracy', meta_train_accuracy / args['meta_batch_size'])
+
+                print('Meta Valid Error', meta_valid_error / args['meta_batch_size'])
+                print('Meta Valid Accuracy', meta_valid_accuracy / args['meta_batch_size'])
+        
             results['train_loss'].append(meta_train_error / args['meta_batch_size'])
             results['train_acc'].append(meta_train_accuracy / args['meta_batch_size'])
 
-            print('Meta Valid Error', meta_valid_error / args['meta_batch_size'])
-            print('Meta Valid Accuracy', meta_valid_accuracy / args['meta_batch_size'])
             results['val_loss'].append(meta_valid_error / args['meta_batch_size'])
             results['val_acc'].append(meta_valid_accuracy / args['meta_batch_size'])
 
@@ -203,7 +205,7 @@ def main(args):
             opt.step()
 
     file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], args['shots'], args['ways'], args['first_order'])
-    saveValues(file_path,results['test_acc'],results['test_loss'], args)
+    saveValues(file_path,results, args)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
