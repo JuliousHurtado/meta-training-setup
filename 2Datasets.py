@@ -131,7 +131,7 @@ def main(args):
     meta_model = getMetaAlgorithm(args, model)
     
     opt = optim.Adam(meta_model.parameters(), args['meta_lr'])
-    loss = nn.CrossEntropyLoss(size_average=True, reduction='mean')
+    loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
         'train_acc': [],

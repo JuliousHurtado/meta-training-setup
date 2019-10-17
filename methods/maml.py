@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import torch as th
+from torch import nn
 from torch.autograd import grad
 
 from learn2learn.algorithms.base_learner import BaseLearner
@@ -137,4 +139,6 @@ class MAML(BaseLearner):
             first_order = self.first_order
         return MAML(clone_module(self.module),
                     lr=self.lr,
+                    adaptation_steps = self.adaptation_steps, 
+                    device = self.device,
                     first_order=first_order)

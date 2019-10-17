@@ -112,8 +112,10 @@ class MetaSGD(BaseLearner):
         learning rates.
         """
         return MetaSGD(clone_module(self.module),
-                       lrs=clone_parameters(self.lrs),
-                       first_order=self.first_order)
+                        adaptation_steps = self.adaptation_steps,
+                        device = self.device,
+                        lrs=clone_parameters(self.lrs),
+                        first_order=self.first_order)
 
     def adapt(self, loss, first_order=None):
         """
