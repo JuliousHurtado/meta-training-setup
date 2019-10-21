@@ -30,6 +30,12 @@ def accuracy(predictions, targets):
 
 
 def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps):
+    if args['algorithm'] == 'protoNet':
+        y_support = torch.LongTensor(adaptation_data.label).to(self.device)
+        valid_error, y_pred = learner.meta_train(adaptation_data, evaluation_data, loss)
+        valid_accuracy = learner.categorical_accuracy(y_support, y_pred)
+        return valid_error, valid_accuracy
+
     if args['algorithm'] != 'sgd':
         learner.meta_train(adaptation_data, evaluation_data, loss)
 
@@ -130,7 +136,10 @@ def main(args):
     meta_model = getMetaAlgorithm(args, model)
     
     opt = optim.Adam(meta_model.parameters(), args['meta_lr'])
-    loss = nn.CrossEntropyLoss(reduction='mean')
+    if args['algorithm'] == 'protonet':
+        loss = nn.NLLLoss()
+    else:
+        loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
         'train_acc': [],
@@ -158,7 +167,15 @@ def main(args):
                 learner = meta_model.clone()
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
 
-                evaluation_error.backward()
+                if args['algorithm'] == 'tmaml':
+                    meta_model.updateGradientOuter(evaluation_error)
+                else:
+                    evaluation_error.backward()
+
+                    if args['algorithm'] in ['sgd', 'protonet']:
+                        opt.step()
+                        opt.zero_grad()
+
                 meta_train_error += evaluation_error.item()
                 meta_train_accuracy += evaluation_accuracy.item()
 
@@ -168,6 +185,15 @@ def main(args):
 
                 meta_valid_error += evaluation_error.item()
                 meta_valid_accuracy += evaluation_accuracy.item()
+
+            # Average the accumulated gradients and optimize
+            if args['algorithm'] == 'tmaml':
+                meta_model.write_grads(valid_generator, opt)
+
+            elif args['algorithm'] not in ['sgd', 'protonet']:
+                for p in meta_model.parameters():
+                    p.grad.data.mul_(1.0 / args['meta_batch_size'])
+                opt.step()
 
             err = []
             acc = []
@@ -199,11 +225,6 @@ def main(args):
             results['test_loss'].append(err)
             results['test_acc'].append(acc)
 
-            # Average the accumulated gradients and optimize
-            for p in meta_model.parameters():
-                p.grad.data.mul_(1.0 / args['meta_batch_size'])
-            opt.step()
-
     file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], args['shots'], args['ways'], args['first_order'])
     saveValues(file_path,results, args)
 
@@ -227,7 +248,7 @@ if __name__ == '__main__':
     parser.add_argument('--adaptation_steps', default=5, type=int)
     parser.add_argument('--num_iterations', default=6000, type=int)
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd'], type=str)
+    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml'], type=str)
 
     #MAML
     parser.add_argument('--first_order', default=False, type=str2bool)
