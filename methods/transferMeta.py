@@ -156,7 +156,7 @@ class TMAML(BaseLearner):
     def updateGradientOuter(self, loss):
         grad_pi = grad(loss,
                          self.module.parameters(),
-                         create_graph=True)
+                         create_graph=False)
 
         if self.sum_grads_pi is None:
             self.sum_grads_pi = grad_pi
@@ -165,14 +165,14 @@ class TMAML(BaseLearner):
             self.sum_grads_pi = self.selectGradient(grad_pi)
             #self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
 
-    def write_grads(self, generator, optimizer, shots):
+    def write_grads(self, generator, optimizer, loss, shots):
         adaptation_data = generator.sample(shots=shots)
 
         data = [d for d in adaptation_data]
         x_dummy = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(self.device)
         y_dummy = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(self.device)
         
-        dummy_loss = self.module(x_dummy, y_dummy)
+        dummy_loss = loss(self.forward(x_dummy), y_dummy)
 
         for i,elem in enumerate(self.module.parameters()):
             elem.grad = self.sum_grads_pi[i].detach()

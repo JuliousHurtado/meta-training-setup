@@ -203,7 +203,7 @@ def main(args):
 
             # Average the accumulated gradients and optimize
             if args['algorithm'] == 'tmaml':
-                meta_model.write_grads(valid_generator, opt, args['shots'])
+                meta_model.write_grads(valid_generator, opt, loss, args['shots'])
 
             elif args['algorithm'] not in ['sgd', 'protonet']:
                 for p in meta_model.parameters():
