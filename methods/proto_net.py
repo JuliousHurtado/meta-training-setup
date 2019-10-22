@@ -23,7 +23,7 @@ from learn2learn.vision.models import OmniglotCNN
 
 
 class ProtoNet(BaseLearner):
-    def __init__(self, model, device, k_wat, n_shot, matching_fn):
+    def __init__(self, model, device, k_way, n_shot, matching_fn = 'l2'):
         super(ProtoNet, self).__init__()
         self.model = model
         self.device = device

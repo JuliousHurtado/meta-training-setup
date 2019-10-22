@@ -17,6 +17,8 @@ from model.omniglot_cnn import OmniglotCNN
 
 from methods.maml import MAML
 from methods.meta_sgd import MetaSGD
+from methods.proto_net import ProtoNet
+from methods.transferMeta import TMAML
 
 from copy import deepcopy
 
@@ -116,6 +118,14 @@ def getMetaAlgorithm(args, model):
         meta_model = MetaSGD(model, adaptation_steps = args['adaptation_steps'], 
                                 device = device,
                                 lr=args['fast_lr'], 
+                                first_order=args['first_order'])
+    elif args['algorithm'] == 'protonet':
+        meta_model = ProtoNet(model, device = device,
+                                k_way = args['ways'],
+                                n_shot = args['shots'])
+    elif args['algorithm'] == 'tmaml':
+        meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
+                                device = device,
                                 first_order=args['first_order'])
     else:
         meta_model = model
@@ -246,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument('--fast_lr', default=0.5, type=float)
     parser.add_argument('--meta_batch_size', default=32, type=int)
     parser.add_argument('--adaptation_steps', default=5, type=int)
-    parser.add_argument('--num_iterations', default=6000, type=int)
+    parser.add_argument('--num_iterations', default=20000, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml'], type=str)
 
