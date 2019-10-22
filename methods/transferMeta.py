@@ -139,7 +139,7 @@ class TMAML(BaseLearner):
         """
         if first_order is None:
             first_order = self.first_order
-        return MAML(clone_module(self.module),
+        return TMAML(clone_module(self.module),
                     lr=self.lr,
                     adaptation_steps = self.adaptation_steps, 
                     device = self.device,
@@ -149,7 +149,7 @@ class TMAML(BaseLearner):
         temp = []
         for i, j in zip(self.sum_grads_pi, grad_pi):
             mask = ((i>0)*(j>0) + (i<0)*(j<0)).float()
-            temp.append(torch.add(i*mask, j*mask))
+            temp.append(th.add(i*mask, j*mask))
 
         return temp
 
@@ -165,8 +165,8 @@ class TMAML(BaseLearner):
             self.sum_grads_pi = self.selectGradient(grad_pi)
             #self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
 
-    def write_grads(self, generator, optimizer):
-        adaptation_data = generator.sample(shots=args['shots'])
+    def write_grads(self, generator, optimizer, shots):
+        adaptation_data = generator.sample(shots=shots)
 
         data = [d for d in adaptation_data]
         x_dummy = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(self.device)
