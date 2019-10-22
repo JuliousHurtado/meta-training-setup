@@ -105,4 +105,4 @@ class ProtoNet(BaseLearner):
             raise (ValueError('Unsupported similarity function'))
 
     def categorical_accuracy(self, y, y_pred):
-        return torch.eq(y_pred.argmax(dim=-1), y).sum() / y_pred.shape[0]
+        return torch.eq(y_pred.argmax(dim=-1), y).sum().float() / y_pred.shape[0]
