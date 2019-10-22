@@ -141,7 +141,7 @@ def main(args):
     generators = {'mini-imagenet': None, 'omniglot': None}
 
     generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    generators['omniglot'] = getDatasets('omniglot', args['ways'])
     
     # Create model
     model = OmniglotCNN(args['ways'])
@@ -164,7 +164,7 @@ def main(args):
         'test_loss': [],
 
     }
-    for dataset in ['mini-imagenet']#,'omniglot']: # 
+    for dataset in ['mini-imagenet','omniglot']: # 
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
@@ -210,16 +210,16 @@ def main(args):
                     p.grad.data.mul_(1.0 / args['meta_batch_size'])
                 opt.step()
 
-            # err = []
-            # acc = []
-            # for dataset2 in ['mini-imagenet', 'omniglot']:
-            #     test_generator = generators[dataset2][2]
-            #     # Compute meta-testing loss
-            #     learner = cloneModel(args, meta_model)
-            #     evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+            err = []
+            acc = []
+            for dataset2 in ['mini-imagenet', 'omniglot']:
+                test_generator = generators[dataset2][2]
+                # Compute meta-testing loss
+                learner = cloneModel(args, meta_model)
+                evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
-            #     err.append(evaluation_error.item())
-            #     acc.append(evaluation_accuracy.item())
+                err.append(evaluation_error.item())
+                acc.append(evaluation_accuracy.item())
 
             # Print some metrics
             if iteration % 50 == 0:

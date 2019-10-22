@@ -39,7 +39,7 @@ class ProtoNet(BaseLearner):
         x_query = torch.stack(evaluation_data.data).float().to(self.device)
         x_support_query = torch.cat([x_support, x_query], dim=0)
 
-        self.episode(loss, x_support_query, y_support)
+        return self.episode(loss, x_support_query, y_support)
 
     def episode(self, loss, x, y):
 
@@ -105,4 +105,4 @@ class ProtoNet(BaseLearner):
             raise (ValueError('Unsupported similarity function'))
 
     def categorical_accuracy(self, y, y_pred):
-        return torch.eq(y_pred.argmax(dim=-1), y).sum().item() / y_pred.shape[0]
+        return torch.eq(y_pred.argmax(dim=-1), y).sum() / y_pred.shape[0]
