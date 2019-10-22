@@ -33,10 +33,10 @@ class ProtoNet(BaseLearner):
         self.matching_fn = matching_fn
 
     def meta_train(self, adaptation_data, evaluation_data, loss):
-        x_support = torch.stack(adaptation_data.data).double().to(self.device)
+        x_support = torch.stack(adaptation_data.data).float().to(self.device)
         y_support = torch.LongTensor(adaptation_data.label).to(self.device)
 
-        x_query = torch.stack(evaluation_data.data).double().to(self.device)
+        x_query = torch.stack(evaluation_data.data).float().to(self.device)
         x_support_query = torch.cat([x_support, x_query], dim=0)
 
         self.episode(loss, x_support_query, y_support)

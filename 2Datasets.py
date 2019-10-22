@@ -31,8 +31,8 @@ def accuracy(predictions, targets):
     return (predictions == targets).sum().float() / targets.size(0)
 
 def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps):
-    if args['algorithm'] == 'protoNet':
-        y_support = torch.LongTensor(adaptation_data.label).to(self.device)
+    if args['algorithm'] == 'protonet':
+        y_support = th.LongTensor(adaptation_data.label).to(device)
         valid_error, y_pred = learner.meta_train(adaptation_data, evaluation_data, loss)
         valid_accuracy = learner.categorical_accuracy(y_support, y_pred)
         return valid_error, valid_accuracy
@@ -133,16 +133,15 @@ def getMetaAlgorithm(args, model):
 
 def cloneModel(args, model):
     if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml']:
-        return meta_model.clone()
-    else:
-        return model
+        return model.clone()
+    return model
 
 def main(args):
     # Create Datasets
     generators = {'mini-imagenet': None, 'omniglot': None}
 
     generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
     
     # Create model
     model = OmniglotCNN(args['ways'])
@@ -165,7 +164,7 @@ def main(args):
         'test_loss': [],
 
     }
-    for dataset in ['mini-imagenet','omniglot']: # 
+    for dataset in ['mini-imagenet']#,'omniglot']: # 
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
@@ -211,16 +210,16 @@ def main(args):
                     p.grad.data.mul_(1.0 / args['meta_batch_size'])
                 opt.step()
 
-            err = []
-            acc = []
-            for dataset2 in ['mini-imagenet', 'omniglot']:
-                test_generator = generators[dataset2][2]
-                # Compute meta-testing loss
-                learner = cloneModel(args, meta_model)
-                evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+            # err = []
+            # acc = []
+            # for dataset2 in ['mini-imagenet', 'omniglot']:
+            #     test_generator = generators[dataset2][2]
+            #     # Compute meta-testing loss
+            #     learner = cloneModel(args, meta_model)
+            #     evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
-                err.append(evaluation_error.item())
-                acc.append(evaluation_accuracy.item())
+            #     err.append(evaluation_error.item())
+            #     acc.append(evaluation_accuracy.item())
 
             # Print some metrics
             if iteration % 50 == 0:
