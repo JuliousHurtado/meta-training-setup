@@ -34,6 +34,7 @@ class ProtoNet(BaseLearner):
 
     def meta_train(self, adaptation_data, evaluation_data, loss):
         x_support = torch.stack(adaptation_data.data).double().to(self.device)
+        y_support = torch.LongTensor(adaptation_data.label).to(self.device)
 
         x_query = torch.stack(evaluation_data.data).double().to(self.device)
         x_support_query = torch.cat([x_support, x_query], dim=0)
@@ -45,11 +46,11 @@ class ProtoNet(BaseLearner):
         embeddings = self.model(x)
         support = embeddings[:self.n_shot * self.k_way]
         queries = embeddings[self.n_shot * self.k_way:]
-        prototypes = compute_prototypes(support)
-        distances = pairwise_distances(queries, prototypes)
+        prototypes = self.compute_prototypes(support)
+        distances = self.pairwise_distances(queries, prototypes)
 
         log_p_y = (-distances).log_softmax(dim=1)
-        loss = loss_fn(log_p_y, y)
+        loss = loss(log_p_y, y)
         y_pred = (-distances).softmax(dim=1)
 
         return loss, y_pred

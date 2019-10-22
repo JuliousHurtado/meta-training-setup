@@ -30,7 +30,6 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
-
 def fast_adapt(adaptation_data, evaluation_data, learner, loss, adaptation_steps):
     if args['algorithm'] == 'protoNet':
         y_support = torch.LongTensor(adaptation_data.label).to(self.device)
