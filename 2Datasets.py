@@ -132,6 +132,12 @@ def getMetaAlgorithm(args, model):
 
     return meta_model
 
+def cloneModel(args, model):
+    if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml']:
+        return meta_model.clone()
+    else:
+        return model
+
 def main(args):
     # Create Datasets
     generators = {'mini-imagenet': None, 'omniglot': None}
@@ -174,7 +180,8 @@ def main(args):
 
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
-                learner = meta_model.clone()
+                learner = cloneModel(args, meta_model)
+
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
 
                 if args['algorithm'] == 'tmaml':
@@ -190,7 +197,7 @@ def main(args):
                 meta_train_accuracy += evaluation_accuracy.item()
 
                 # Compute meta-validation loss
-                learner = meta_model.clone()
+                learner = cloneModel(args, meta_model)
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, valid_generator, learner, loss)
 
                 meta_valid_error += evaluation_error.item()
@@ -210,7 +217,7 @@ def main(args):
             for dataset2 in ['mini-imagenet', 'omniglot']:
                 test_generator = generators[dataset2][2]
                 # Compute meta-testing loss
-                learner = meta_model.clone()
+                learner = cloneModel(args, meta_model)
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
                 err.append(evaluation_error.item())
