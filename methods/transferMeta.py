@@ -93,6 +93,7 @@ class TMAML(BaseLearner):
         self.device = device
 
         self.sum_grads_pi = None
+        self.mask = None
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
@@ -146,12 +147,8 @@ class TMAML(BaseLearner):
                     first_order=first_order)
 
     def selectGradient(self,grad_pi):
-        temp = []
-        for i, j in zip(self.sum_grads_pi, grad_pi):
-            mask = ((i>0)*(j>0) + (i<0)*(j<0)).float()
-            temp.append(th.add(i*mask, j*mask))
-
-        return temp
+        for i, j, m in zip(self.sum_grads_pi, grad_pi, self.mask):
+            m += ((i>0)*(j>0) + (i<0)*(j<0)).float()
 
     def updateGradientOuter(self, loss):
         grad_pi = grad(loss,
@@ -160,10 +157,16 @@ class TMAML(BaseLearner):
 
         if self.sum_grads_pi is None:
             self.sum_grads_pi = grad_pi
+            self.mask = []
+            for i in range(len(grad_pi)):
+                self.mask.append(th.new_zeros(grad_pi[i].size()))
         else:  # accumulate all gradients from different episode learner
-            #TODO
-            self.sum_grads_pi = self.selectGradient(grad_pi)
-            #self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
+            self.selectGradient(grad_pi)
+            self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
+
+    def setMask(self):
+        for m in self.mask:
+            m = ( m > 5).float()
 
     def write_grads(self, generator, optimizer, loss, shots):
         adaptation_data = generator.sample(shots=shots)
@@ -174,11 +177,14 @@ class TMAML(BaseLearner):
         
         dummy_loss = loss(self.forward(x_dummy), y_dummy)
 
+        self.setMask()
+        
         for i,elem in enumerate(self.module.parameters()):
-            elem.grad = self.sum_grads_pi[i].detach()
+            elem.grad = self.sum_grads_pi[i].detach()*self.mask[i]
 
         optimizer.zero_grad()
         dummy_loss.backward()
         optimizer.step()
 
         self.sum_grads_pi = None
+        self.mask = None
