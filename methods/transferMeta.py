@@ -84,7 +84,8 @@ class TMAML(BaseLearner):
     ~~~
     """
 
-    def __init__(self, model, lr, adaptation_steps = 1, device = 'cpu', first_order=False):
+    def __init__(self, model, lr, adaptation_steps = 1, min_use = 0, 
+                    device = 'cpu', first_order=False):
         super(TMAML, self).__init__()
         self.module = model
         self.lr = lr
@@ -94,6 +95,8 @@ class TMAML(BaseLearner):
 
         self.sum_grads_pi = None
         self.mask = None
+
+        self.min_used = min_use
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
@@ -159,14 +162,14 @@ class TMAML(BaseLearner):
             self.sum_grads_pi = grad_pi
             self.mask = []
             for i in range(len(grad_pi)):
-                self.mask.append(th.new_zeros(grad_pi[i].size()))
+                self.mask.append(th.zeros_like(grad_pi[i]))
         else:  # accumulate all gradients from different episode learner
             self.selectGradient(grad_pi)
-            self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
+            self.sum_grads_pi = [th.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
 
     def setMask(self):
         for m in self.mask:
-            m = ( m > 5).float()
+            m = ( m >= self.min_use).float()
 
     def write_grads(self, generator, optimizer, loss, shots):
         adaptation_data = generator.sample(shots=shots)
