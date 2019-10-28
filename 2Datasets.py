@@ -124,7 +124,7 @@ def getMetaAlgorithm(args, model):
                                 n_shot = args['shots'])
     elif args['algorithm'] == 'tmaml':
         meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                min_use = args['min_used']
+                                min_use = args['min_used'],
                                 device = device,
                                 first_order=args['first_order'])
     else:

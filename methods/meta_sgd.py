@@ -132,8 +132,8 @@ class MetaSGD(BaseLearner):
                          create_graph=second_order)
         self.module = meta_sgd_update(self.module, self.lrs, gradients)
 
-    def setLinear(self, num_dataset):
-        self.module.setLinear(num_dataset)
+    def setLinear(self, num_dataset, device):
+        self.module.setLinear(num_dataset, device)
 
 
 if __name__ == '__main__':

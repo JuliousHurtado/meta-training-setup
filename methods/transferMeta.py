@@ -146,6 +146,7 @@ class TMAML(BaseLearner):
         return TMAML(clone_module(self.module),
                     lr=self.lr,
                     adaptation_steps = self.adaptation_steps, 
+                    min_use = self.min_use,
                     device = self.device,
                     first_order=first_order)
 
@@ -192,5 +193,5 @@ class TMAML(BaseLearner):
         self.sum_grads_pi = None
         self.mask = None
 
-    def setLinear(self, num_dataset):
-        self.module.setLinear(num_dataset)
+    def setLinear(self, num_dataset, device):
+        self.module.setLinear(num_dataset, device)

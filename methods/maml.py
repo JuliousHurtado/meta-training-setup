@@ -143,5 +143,5 @@ class MAML(BaseLearner):
                     device = self.device,
                     first_order=first_order)
 
-    def setLinear(self, num_dataset):
-        self.module.setLinear(num_dataset)
+    def setLinear(self, num_dataset, device):
+        self.module.setLinear(num_dataset, device)

@@ -106,7 +106,7 @@ class OmniglotCNN(nn.Module):
                              max_pool_factor=4 // layers)
 
         self.linears = []
-        for _ in num_datasets:
+        for _ in range(num_datasets):
             self.linears.append(nn.Linear(25 * hidden_size, output_size, bias=True))
             maml_init_(self.linears[-1])
 
@@ -120,8 +120,8 @@ class OmniglotCNN(nn.Module):
         x = self.linear(x.view(-1, 25 * self.hidden_size))
         return x
 
-    def setLinear(self, num_data):
-        self.linear = self.linears[num_data]
+    def setLinear(self, num_data, device):
+        self.linear = self.linears[num_data].to(device)
 
     def clone(self):
         return self

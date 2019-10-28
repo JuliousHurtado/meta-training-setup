@@ -107,5 +107,5 @@ class ProtoNet(BaseLearner):
     def categorical_accuracy(self, y, y_pred):
         return torch.eq(y_pred.argmax(dim=-1), y).sum().float() / y_pred.shape[0]
 
-    def setLinear(self, num_dataset):
-        self.model.setLinear(num_dataset)
+    def setLinear(self, num_dataset, device):
+        self.model.setLinear(num_dataset, device)
