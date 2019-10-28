@@ -178,7 +178,7 @@ class TMAML(BaseLearner):
         dummy_loss = loss(self.forward(x_dummy), y_dummy)
 
         self.setMask()
-        
+
         for i,elem in enumerate(self.module.parameters()):
             elem.grad = self.sum_grads_pi[i].detach()*self.mask[i]
 
@@ -188,3 +188,6 @@ class TMAML(BaseLearner):
 
         self.sum_grads_pi = None
         self.mask = None
+
+    def setLinear(self, num_dataset):
+        self.module.setLinear(num_dataset)

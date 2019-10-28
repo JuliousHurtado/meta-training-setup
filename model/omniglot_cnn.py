@@ -95,7 +95,7 @@ class OmniglotCNN(nn.Module):
     ~~~
     """
 
-    def __init__(self, output_size=5, hidden_size=64, layers=4):
+    def __init__(self, output_size=5, hidden_size=64, layers=4, num_datasets = 2):
         super(OmniglotCNN, self).__init__()
         self.hidden_size = hidden_size
         self.base = ConvBase(output_size=hidden_size,
@@ -104,14 +104,24 @@ class OmniglotCNN(nn.Module):
                              max_pool=True,
                              layers=layers,
                              max_pool_factor=4 // layers)
-        self.linear = nn.Linear(25 * hidden_size, output_size, bias=True)
-        maml_init_(self.linear)
+
+        self.linears = []
+        for _ in num_datasets:
+            self.linears.append(nn.Linear(25 * hidden_size, output_size, bias=True))
+            maml_init_(self.linears[-1])
+
+        #self.linear = nn.Linear(25 * hidden_size, output_size, bias=True)
+        #maml_init_(self.linear)
+        self.linear = self.linears[0]
         self.hidden_size = hidden_size
 
     def forward(self, x):
         x = self.base(x)
         x = self.linear(x.view(-1, 25 * self.hidden_size))
         return x
+
+    def setLinear(self, num_data):
+        self.linear = self.linears[num_data]
 
     def clone(self):
         return self

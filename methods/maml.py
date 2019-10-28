@@ -142,3 +142,6 @@ class MAML(BaseLearner):
                     adaptation_steps = self.adaptation_steps, 
                     device = self.device,
                     first_order=first_order)
+
+    def setLinear(self, num_dataset):
+        self.module.setLinear(num_dataset)

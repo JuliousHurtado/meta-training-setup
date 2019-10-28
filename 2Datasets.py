@@ -164,7 +164,7 @@ def main(args):
         'test_loss': [],
 
     }
-    for dataset in ['mini-imagenet','omniglot']: # 
+    for i,dataset in enumerate(['mini-imagenet','omniglot']): # 
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
@@ -178,6 +178,7 @@ def main(args):
 
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
+                meta_model.setLinear(i)
                 learner = cloneModel(args, meta_model)
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
@@ -212,9 +213,10 @@ def main(args):
 
             err = []
             acc = []
-            for dataset2 in ['mini-imagenet', 'omniglot']:
+            for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
                 test_generator = generators[dataset2][2]
                 # Compute meta-testing loss
+                meta_model.setLinear(j)
                 learner = cloneModel(args, meta_model)
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
@@ -241,7 +243,7 @@ def main(args):
             results['test_acc'].append(acc)
 
     file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], args['shots'], args['ways'], args['first_order'])
-    saveValues(file_path,results, args)
+    saveValues(file_path, results, args)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
