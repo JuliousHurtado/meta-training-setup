@@ -159,14 +159,14 @@ class TMAML(BaseLearner):
             self.sum_grads_pi = grad_pi
             self.mask = []
             for i in range(len(grad_pi)):
-                self.mask.append(th.new_zeros(grad_pi[i].size()))
+                self.mask.append(th.zeros_like(grad_pi[i]))
         else:  # accumulate all gradients from different episode learner
             self.selectGradient(grad_pi)
-            self.sum_grads_pi = [torch.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
+            self.sum_grads_pi = [th.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
 
     def setMask(self):
         for m in self.mask:
-            m = ( m > 5).float()
+            m = ( m >= 0).float()
 
     def write_grads(self, generator, optimizer, loss, shots):
         adaptation_data = generator.sample(shots=shots)
