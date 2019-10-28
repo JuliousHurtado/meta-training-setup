@@ -179,7 +179,7 @@ def main(args):
 
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
-                meta_model.setLinear(i)
+                meta_model.setLinear(i, device)
                 learner = cloneModel(args, meta_model)
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
@@ -217,7 +217,7 @@ def main(args):
             for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
                 test_generator = generators[dataset2][2]
                 # Compute meta-testing loss
-                meta_model.setLinear(j)
+                meta_model.setLinear(j, device)
                 learner = cloneModel(args, meta_model)
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
