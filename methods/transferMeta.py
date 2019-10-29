@@ -84,7 +84,7 @@ class TMAML(BaseLearner):
     ~~~
     """
 
-    def __init__(self, model, lr, adaptation_steps = 1, min_use = 0, 
+    def __init__(self, model, lr, adaptation_steps = 1, min_used = 0, 
                     device = 'cpu', first_order=False):
         super(TMAML, self).__init__()
         self.module = model
@@ -96,7 +96,7 @@ class TMAML(BaseLearner):
         self.sum_grads_pi = None
         self.mask = None
 
-        self.min_used = min_use
+        self.min_used = min_used
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
@@ -146,7 +146,7 @@ class TMAML(BaseLearner):
         return TMAML(clone_module(self.module),
                     lr=self.lr,
                     adaptation_steps = self.adaptation_steps, 
-                    min_use = self.min_use,
+                    min_used = self.min_used,
                     device = self.device,
                     first_order=first_order)
 
@@ -170,7 +170,7 @@ class TMAML(BaseLearner):
 
     def setMask(self):
         for m in self.mask:
-            m = ( m >= self.min_use).float()
+            m = ( m >= self.min_used).float()
 
     def write_grads(self, generator, optimizer, loss, shots):
         adaptation_data = generator.sample(shots=shots)
