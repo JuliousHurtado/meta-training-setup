@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 from torch.autograd import grad
+import copy
 
 from learn2learn.algorithms.base_learner import BaseLearner
 from learn2learn.utils import clone_module
@@ -93,8 +94,8 @@ class TMAML(BaseLearner):
         self.adaptation_steps = adaptation_steps
         self.device = device
 
-        self.sum_grads_pi = None
-        self.mask = None
+        self.previous_grad = None
+        self.grad_batches = None
 
         self.min_used = min_used
 
@@ -150,48 +151,75 @@ class TMAML(BaseLearner):
                     device = self.device,
                     first_order=first_order)
 
-    def selectGradient(self,grad_pi):
-        for i, j, m in zip(self.sum_grads_pi, grad_pi, self.mask):
-            m += ((i>0)*(j>0) + (i<0)*(j<0)).float()
-
-    def updateGradientOuter(self, loss):
-        grad_pi = grad(loss,
-                         self.module.parameters(),
-                         create_graph=False)
-
-        if self.sum_grads_pi is None:
-            self.sum_grads_pi = grad_pi
-            self.mask = []
-            for i in range(len(grad_pi)):
-                self.mask.append(th.zeros_like(grad_pi[i]))
-        else:  # accumulate all gradients from different episode learner
-            self.selectGradient(grad_pi)
-            self.sum_grads_pi = [th.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
-
-    def setMask(self):
-        for m in self.mask:
-            m = ( m >= self.min_used).float()
-
-    def write_grads(self, generator, optimizer, loss, shots):
-        adaptation_data = generator.sample(shots=shots)
-
-        data = [d for d in adaptation_data]
-        x_dummy = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(self.device)
-        y_dummy = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(self.device)
-        
-        dummy_loss = loss(self.forward(x_dummy), y_dummy)
-
-        self.setMask()
-
-        for i,elem in enumerate(self.module.parameters()):
-            elem.grad = self.sum_grads_pi[i].detach()*self.mask[i]
-
-        optimizer.zero_grad()
-        dummy_loss.backward()
-        optimizer.step()
-
-        self.sum_grads_pi = None
-        self.mask = None
-
     def setLinear(self, num_dataset, device):
         self.module.setLinear(num_dataset, device)
+
+    def getGradients(self):
+        print("New Batch")
+        if self.previous_grad is None:
+            self.previous_grad = []
+            self.grad_batches = {}
+            for i, p in enumerate(self.parameters()):
+                self.previous_grad.append(p.grad.data)
+                self.grad_batches[i] = [p.grad.data]
+        else:
+            temp = []
+            for p, p_g, i in zip(self.parameters(), self.previous_grad, range(len(self.previous_grad))):
+                temp.append(p.grad.data)
+                self.grad_batches[i].append(p.grad.data - p_g)
+                print(i,"\t",self.grad_batches[i].sum())
+            self.previous_grad = copy.deepcopy(temp)
+
+    def createMask(self):
+        pass
+
+    def setMask(self):
+        for p in meta_model.parameters():
+            p.grad.data.mul_(th.ones_like(p))
+
+    # def selectGradient(self,grad_pi):
+    #     for i, j, m in zip(self.sum_grads_pi, grad_pi, self.mask):
+    #         m += ((i>0)*(j>0) + (i<0)*(j<0)).float()
+
+    # def updateGradientOuter(self, loss):
+    #     grad_pi = grad(loss,
+    #                      self.module.parameters(),
+    #                      create_graph=False)
+
+    #     if self.sum_grads_pi is None:
+    #         self.sum_grads_pi = grad_pi
+    #         self.mask = []
+    #         for i in range(len(grad_pi)):
+    #             self.mask.append(th.zeros_like(grad_pi[i]))
+    #     else:  # accumulate all gradients from different episode learner
+    #         self.selectGradient(grad_pi)
+    #         self.sum_grads_pi = [th.add(i, j) for i, j in zip(self.sum_grads_pi, grad_pi)]
+
+    # def setMask(self):
+    #     for m in self.mask:
+    #         m = ( m >= self.min_used).float()
+
+    # def write_grads(self, generator, optimizer, loss, shots, meta_b_s):
+    #     adaptation_data = generator.sample(shots=shots)
+
+    #     data = [d for d in adaptation_data]
+    #     x_dummy = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(self.device)
+    #     y_dummy = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(self.device)
+        
+    #     dummy_loss = loss(self.forward(x_dummy), y_dummy)
+
+    #     self.setMask()
+
+    #     optimizer.zero_grad()
+    #     dummy_loss.backward()
+
+    #     for i,elem in enumerate(self.module.parameters()):
+    #         print(i)
+    #         print("Max: ", max(self.mask[i]))
+    #         print("Min: ", min(self.mask[i]))
+    #         elem.grad = self.sum_grads_pi[i].detach()*self.mask[i]/meta_b_s
+        
+    #     optimizer.step()
+
+    #     self.sum_grads_pi = None
+    #     self.mask = None

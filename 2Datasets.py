@@ -124,7 +124,7 @@ def getMetaAlgorithm(args, model):
                                 n_shot = args['shots'])
     elif args['algorithm'] == 'tmaml':
         meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                min_use = args['min_used'],
+                                min_used = args['min_used'],
                                 device = device,
                                 first_order=args['first_order'])
     else:
@@ -184,14 +184,13 @@ def main(args):
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
 
+                evaluation_error.backward()
                 if args['algorithm'] == 'tmaml':
-                    meta_model.updateGradientOuter(evaluation_error)
-                else:
-                    evaluation_error.backward()
+                    meta_model.getGradients(task)
 
-                    if args['algorithm'] in ['sgd', 'protonet']:
-                        opt.step()
-                        opt.zero_grad()
+                if args['algorithm'] in ['sgd', 'protonet']:
+                    opt.step()
+                    opt.zero_grad()
 
                 meta_train_error += evaluation_error.item()
                 meta_train_accuracy += evaluation_accuracy.item()
@@ -204,10 +203,12 @@ def main(args):
                 meta_valid_accuracy += evaluation_accuracy.item()
 
             # Average the accumulated gradients and optimize
-            if args['algorithm'] == 'tmaml':
-                meta_model.write_grads(valid_generator, opt, loss, args['shots'])
+            
+            #    meta_model.write_grads(valid_generator, opt, loss, args['shots'], args['meta_batch_size'])
 
-            elif args['algorithm'] not in ['sgd', 'protonet']:
+            if args['algorithm'] not in ['sgd', 'protonet']:
+                if args['algorithm'] == 'tmaml':
+                    meta_model.setMask()
                 for p in meta_model.parameters():
                     p.grad.data.mul_(1.0 / args['meta_batch_size'])
                 opt.step()
