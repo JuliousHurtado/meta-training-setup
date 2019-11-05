@@ -96,6 +96,7 @@ class TMAML(BaseLearner):
 
         self.previous_grad = None
         self.grad_batches = None
+        self.mask = None
 
         self.min_used = min_used
 
@@ -155,7 +156,6 @@ class TMAML(BaseLearner):
         self.module.setLinear(num_dataset, device)
 
     def getGradients(self):
-        print("New Batch")
         if self.previous_grad is None:
             self.previous_grad = []
             self.grad_batches = {}
@@ -167,15 +167,28 @@ class TMAML(BaseLearner):
             for p, p_g, i in zip(self.parameters(), self.previous_grad, range(len(self.previous_grad))):
                 temp.append(p.grad.data)
                 self.grad_batches[i].append(p.grad.data - p_g)
-                print(i,"\t",self.grad_batches[i].sum())
+                #print(i,"\t",self.grad_batches[i].sum())
             self.previous_grad = copy.deepcopy(temp)
 
     def createMask(self):
-        pass
+        self.mask = []
+        for i in range(len(self.grad_batches)):
+            m = th.zeros_like(self.grad_batches[i][0])
+            for elem in self.grad_batches[i]:
+                m += (elem > 0).float()
+
+            m_f = ( m >= self.min_used).float().to(m.device)
+            self.mask.append(m_f)
 
     def setMask(self):
-        for p in meta_model.parameters():
-            p.grad.data.mul_(th.ones_like(p))
+        self.createMask()
+        for i, p in enumerate(self.parameters()):
+            #p.grad.data.mul_(th.ones_like(p))
+            p.grad.data.mul_(self.mask[i])
+
+        self.previous_grad = None
+        self.mask = None
+        self.grad_batches = None
 
     # def selectGradient(self,grad_pi):
     #     for i, j, m in zip(self.sum_grads_pi, grad_pi, self.mask):
