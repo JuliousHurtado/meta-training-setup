@@ -173,11 +173,13 @@ class TMAML(BaseLearner):
     def createMask(self):
         self.mask = []
         for i in range(len(self.grad_batches)):
-            m = th.zeros_like(self.grad_batches[i][0])
+            m_up = th.zeros_like(self.grad_batches[i][0])
+            m_down = th.zeros_like(self.grad_batches[i][0])
             for elem in self.grad_batches[i]:
-                m += (elem > 0).float()
+                m_up += (elem >= 0).float()
+                m_down += (elem < 0).float()
 
-            m_f = ( m >= self.min_used).float().to(m.device)
+            m_f = ( m_up >= self.min_used & m_down >= self.min_used ).float().to(m.device)
             self.mask.append(m_f)
 
     def setMask(self):

@@ -123,8 +123,10 @@ def getMetaAlgorithm(args, model):
                                 k_way = args['ways'],
                                 n_shot = args['shots'])
     elif args['algorithm'] == 'tmaml':
+        if args['min_used'] > 1:
+            args['min_used'] = 1
         meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                min_used = args['min_used'],
+                                min_used = args['meta_batch_size']*args['min_used'],
                                 device = device,
                                 first_order=args['first_order'])
     else:
@@ -186,7 +188,7 @@ def main(args):
 
                 evaluation_error.backward()
                 if args['algorithm'] == 'tmaml':
-                    meta_model.getGradients(task)
+                    meta_model.getGradients()
 
                 if args['algorithm'] in ['sgd', 'protonet']:
                     opt.step()
@@ -273,7 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('--first_order', default=False, type=str2bool)
 
     #Transfer
-    parser.add_argument('--min_used', default=0, type=int)
+    parser.add_argument('--min_used', default=0.0, type=float)
 
     # ProtoNet
     parser.add_argument('--distance', default='l2')
