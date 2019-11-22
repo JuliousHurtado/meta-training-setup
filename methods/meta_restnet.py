@@ -96,3 +96,7 @@ class MetaRestNet(BaseLearner):
 
     def setLinear(self, num_dataset, device):
         self.module.setLinear(num_dataset, device)
+
+    def printParam(self):
+        for i, param in enumerate(self.module.parameters()):
+            print("{}_{}".format(i, param.sum()))

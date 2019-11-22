@@ -96,6 +96,8 @@ def main(args):
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
+
+        opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
         
         for iteration in range(args['num_iterations']):
             opt.zero_grad()
@@ -107,11 +109,11 @@ def main(args):
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
                 meta_model.setLinear(i, device)
-                opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
                 learner = cloneModel(args, meta_model)
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
-
+                meta_model.printParam()
+                
                 evaluation_error.backward()
                 if args['algorithm'] == 'tmaml':
                     meta_model.getGradients()
@@ -131,7 +133,6 @@ def main(args):
                 meta_valid_accuracy += evaluation_accuracy.item()
 
             # Average the accumulated gradients and optimize
-            
             #    meta_model.write_grads(valid_generator, opt, loss, args['shots'], args['meta_batch_size'])
 
             if args['algorithm'] not in ['sgd', 'protonet']:
@@ -140,6 +141,7 @@ def main(args):
                 for p in meta_model.parameters():
                     p.grad.data.mul_(1.0 / args['meta_batch_size'])
                 opt.step()
+                meta_model.printParam()
 
             if iteration % 20 == 0:
                 err = []
