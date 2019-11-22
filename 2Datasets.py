@@ -181,7 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_iterations', default=20000, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--freeze_block', default=1, type=int)
-    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-restNet'], type=str)
+    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-resnet'], type=str)
 
     #MAML
     parser.add_argument('--first_order', default=True, type=str2bool)

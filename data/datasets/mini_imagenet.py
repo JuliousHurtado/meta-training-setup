@@ -7,8 +7,9 @@ import numpy as np
 import os
 import torch
 import pickle
+from PIL import Image
 
-import request
+import requests
 
 def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
@@ -110,7 +111,7 @@ class MiniImagenet(data.Dataset):
         self.data = pickle.load(f)
 
         #self.x = torch.FloatTensor([np.transpose(x, (2, 0, 1)) for x in self.data['image_data']])
-        self.x = [np.transpose(x, (2, 0, 1)) for x in self.data['image_data']]
+        self.x = [Image.fraomarray(np.transpose(x, (2, 0, 1))) for x in self.data['image_data']]
         self.y = torch.zeros(len(self.x)) #[-1 for _ in range(len(self.x))]
         self.class_idx = index_classes(self.data['class_dict'].keys())
         for class_name, idxs in self.data['class_dict'].items():
