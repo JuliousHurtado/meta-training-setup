@@ -111,7 +111,7 @@ class MiniImagenet(data.Dataset):
         self.data = pickle.load(f)
 
         #self.x = torch.FloatTensor([np.transpose(x, (2, 0, 1)) for x in self.data['image_data']])
-        self.x = [Image.fraomarray(np.transpose(x, (2, 0, 1))) for x in self.data['image_data']]
+        self.x = [Image.fromarray(x.astype('uint8'), 'RGB') for x in self.data['image_data']]
         self.y = torch.zeros(len(self.x)) #[-1 for _ in range(len(self.x))]
         self.class_idx = index_classes(self.data['class_dict'].keys())
         for class_name, idxs in self.data['class_dict'].items():

@@ -59,15 +59,19 @@ def main(args):
     # Create Datasets
     generators = {'mini-imagenet': None, 'omniglot': None}
 
+    print("Reading datasets")
     generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
     
     # Create model
+    print("Creating Model")
     model = OmniglotCNN(args['ways'])
     model.to(device)
 
+    print("Getting Meta Algorithm")
     meta_model = getMetaAlgorithm(args, model)
     
+    print("Obtaining optimizer")
     opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
     if args['algorithm'] == 'protonet':
         loss = nn.NLLLoss()
@@ -132,17 +136,20 @@ def main(args):
                     p.grad.data.mul_(1.0 / args['meta_batch_size'])
                 opt.step()
 
-            err = []
-            acc = []
-            for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
-                test_generator = generators[dataset2][2]
-                # Compute meta-testing loss
-                meta_model.setLinear(j, device)
-                learner = cloneModel(args, meta_model)
-                evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+            if iteration % 20 == 0:
+                err = []
+                acc = []
+                for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
+                    test_generator = generators[dataset2][2]
+                    # Compute meta-testing loss
+                    meta_model.setLinear(j, device)
+                    learner = cloneModel(args, meta_model)
+                    evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
 
-                err.append(evaluation_error.item())
-                acc.append(evaluation_accuracy.item())
+                    err.append(evaluation_error.item())
+                    acc.append(evaluation_accuracy.item())
+                results['test_loss'].append(err)
+                results['test_acc'].append(acc)
 
             # Print some metrics
             if iteration % 50 == 0:
@@ -159,9 +166,6 @@ def main(args):
 
             results['val_loss'].append(meta_valid_error / args['meta_batch_size'])
             results['val_acc'].append(meta_valid_accuracy / args['meta_batch_size'])
-
-            results['test_loss'].append(err)
-            results['test_acc'].append(acc)
 
     file_path = 'results/2datasets_{}_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
                                                                 args['shots'], args['ways'], 
