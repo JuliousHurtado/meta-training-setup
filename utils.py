@@ -13,6 +13,17 @@ from methods.meta_restnet import MetaRestNet
 
 from data.datasets.full_omniglot import FullOmniglot
 from data.datasets.mini_imagenet import MiniImagenet
+from data.datasets.randomSet import RandomSet
+
+def getRandomDataset(ways):
+    tasks_list = [20, 10, 10]
+    generators = {'train': None, 'validation': None, 'test': None}
+    for mode, tasks in zip(['train','validation','test'], tasks_list):
+        dataset = RandomSet()
+        dataset = l2l.data.MetaDataset(dataset)
+        generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
+
+    return generators['train'], generators['validation'], generators['test']
 
 def getDatasets(dataset, ways):
     tasks_list = [20000, 1024, 1024]

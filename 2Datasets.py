@@ -80,8 +80,11 @@ def main(args):
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])#getDatasets('mini-imagenet', args['ways'])
+    #generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])#getDatasets('mini-imagenet', args['ways'])
     #generators['omniglot'] = getDatasets('omniglot', args['ways'])
+
+    generators['mini-imagenet'] = getRandomDataset(args['ways'])
+    generators['omniglot'] = getRandomDataset(args['ways'])
 
     results = {
         'train_acc': [],
