@@ -1,28 +1,17 @@
-import os
 import random
 import argparse
 import time
 
 import numpy as np
 import torch as th
-from PIL.Image import LANCZOS
-
 from torch import nn
 from torch import optim
-from torchvision import transforms
-from torchvision.datasets import ImageFolder
 
-from data.datasets.full_omniglot import FullOmniglot
 from model.omniglot_cnn import OmniglotCNN
 
-from methods.maml import MAML
-from methods.meta_sgd import MetaSGD
-from methods.proto_net import ProtoNet
-from methods.transferMeta import TMAML
+from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm
 
 from copy import deepcopy
-
-import learn2learn as l2l
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -61,79 +50,6 @@ def adaptationProcess(args, generator, learner, loss):
                                                                    args['adaptation_steps'])
     return evaluation_error, evaluation_accuracy
 
-def getDatasets(dataset, ways):
-    tasks_list = [20000, 1024, 1024]
-    generators = {'train': None, 'validation': None, 'test': None}
-    if dataset == 'mini-imagenet':
-        for mode, tasks in zip(['train','validation','test'], tasks_list):
-            dataset = l2l.vision.datasets.MiniImagenet(root='./data/data', mode=mode, 
-                                transform = transforms.Compose([
-                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-                ]))
-
-            dataset = l2l.data.MetaDataset(dataset)
-            generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
-    else:
-        omniglot = FullOmniglot(root='./data/data',
-                                                transform=transforms.Compose([
-                                                    l2l.vision.transforms.RandomDiscreteRotation(
-                                                        [0.0, 90.0, 180.0, 270.0]),
-                                                    transforms.Resize(84, interpolation=LANCZOS),
-                                                    transforms.ToTensor(),
-                                                    lambda x: 1.0 - x,
-                                                ]),
-                                                download=False, to_color = True)
-
-        omniglot = l2l.data.MetaDataset(omniglot)
-        classes = list(range(1623))
-        random.shuffle(classes)
-        generators['train'] = l2l.data.TaskGenerator(dataset=omniglot,
-                                                 ways=ways,
-                                                 classes=classes[:1100],
-                                                 tasks=20000)
-        generators['validation'] = l2l.data.TaskGenerator(dataset=omniglot,
-                                                 ways=ways,
-                                                 classes=classes[1100:1200],
-                                                 tasks=1024)
-        generators['test'] = l2l.data.TaskGenerator(dataset=omniglot,
-                                                ways=ways,
-                                                classes=classes[1200:],
-                                                tasks=1024)
-
-    return generators['train'], generators['validation'], generators['test']
-
-def saveValues(name_file, results, args):
-    th.save({
-            'results': results,
-            'args': args
-            }, name_file)
-
-def getMetaAlgorithm(args, model):
-    if args['algorithm'] == 'maml':
-        meta_model = MAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                device = device,
-                                first_order=args['first_order'])
-    elif args['algorithm'] == 'meta-sgd':
-        meta_model = MetaSGD(model, adaptation_steps = args['adaptation_steps'], 
-                                device = device,
-                                lr=args['fast_lr'], 
-                                first_order=args['first_order'])
-    elif args['algorithm'] == 'protonet':
-        meta_model = ProtoNet(model, device = device,
-                                k_way = args['ways'],
-                                n_shot = args['shots'])
-    elif args['algorithm'] == 'tmaml':
-        if args['min_used'] > 1:
-            args['min_used'] = 1
-        meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                min_used = args['meta_batch_size']*args['min_used'],
-                                device = device,
-                                first_order=args['first_order'])
-    else:
-        meta_model = model
-
-    return meta_model
-
 def cloneModel(args, model):
     if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml']:
         return model.clone()
@@ -152,7 +68,7 @@ def main(args):
 
     meta_model = getMetaAlgorithm(args, model)
     
-    opt = optim.Adam(meta_model.parameters(), args['meta_lr'])
+    opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
     if args['algorithm'] == 'protonet':
         loss = nn.NLLLoss()
     else:
@@ -182,6 +98,7 @@ def main(args):
             for task in range(args['meta_batch_size']):
                 # Compute meta-training loss
                 meta_model.setLinear(i, device)
+                opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
                 learner = cloneModel(args, meta_model)
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
@@ -246,16 +163,10 @@ def main(args):
             results['test_loss'].append(err)
             results['test_acc'].append(acc)
 
-    file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], args['shots'], args['ways'], args['first_order'])
+    file_path = 'results/2datasets_{}_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
+                                                                args['shots'], args['ways'], 
+                                                                args['first_order'], args['min_used'])
     saveValues(file_path, results, args)
-
-def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0', 'False'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 if __name__ == '__main__':
 
@@ -269,10 +180,11 @@ if __name__ == '__main__':
     parser.add_argument('--adaptation_steps', default=5, type=int)
     parser.add_argument('--num_iterations', default=20000, type=int)
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml'], type=str)
+    parser.add_argument('--freeze_block', default=1, type=int)
+    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-restNet'], type=str)
 
     #MAML
-    parser.add_argument('--first_order', default=False, type=str2bool)
+    parser.add_argument('--first_order', default=True, type=str2bool)
 
     #Transfer
     parser.add_argument('--min_used', default=0.0, type=float)
