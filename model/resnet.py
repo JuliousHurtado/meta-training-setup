@@ -168,7 +168,7 @@ class ResNet(nn.Module):
     def createLineals(self, num_datasets, ways):
         self.linears = []
         for _ in range(num_datasets):
-            self.linears.append(nn.Linear(512 * block.expansion, ways, bias=True))
+            self.linears.append(nn.Linear(self.fc.weight[1], ways, bias=True))
 
         self.fc = self.linears[0]
 

@@ -60,12 +60,12 @@ def main(args):
     # Create Datasets
     generators = {'mini-imagenet': None, 'omniglot': None}
 
-    print("Reading datasets")
+    print("Reading datasets", flush=True)
     generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
     #generators['omniglot'] = getDatasets('omniglot', args['ways'])
     
     # Create model
-    print("Creating Model")
+    print("Creating Model", flush=True)
     if True:
         model = resnet18(pretrained = True)
         model.createLineals(2, args['ways'])
@@ -73,10 +73,10 @@ def main(args):
         model = OmniglotCNN(args['ways'])
     model.to(device)
 
-    print("Getting Meta Algorithm")
+    print("Getting Meta Algorithm", flush=True)
     meta_model = getMetaAlgorithm(args, model)
     
-    print("Obtaining optimizer")
+    print("Obtaining optimizer", flush=True)
     opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
     if args['algorithm'] == 'protonet':
         loss = nn.NLLLoss()
@@ -164,7 +164,7 @@ def main(args):
                 print('Meta Train Accuracy', meta_train_accuracy / args['meta_batch_size'])
 
                 print('Meta Valid Error', meta_valid_error / args['meta_batch_size'])
-                print('Meta Valid Accuracy', meta_valid_accuracy / args['meta_batch_size'])
+                print('Meta Valid Accuracy', meta_valid_accuracy / args['meta_batch_size'], flush=True)
         
             results['train_loss'].append(meta_train_error / args['meta_batch_size'])
             results['train_acc'].append(meta_train_accuracy / args['meta_batch_size'])
