@@ -8,6 +8,7 @@ from torch import nn
 from torch import optim
 
 from model.omniglot_cnn import OmniglotCNN
+from model.resnet import resnet18
 
 from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm
 
@@ -65,7 +66,11 @@ def main(args):
     
     # Create model
     print("Creating Model")
-    model = OmniglotCNN(args['ways'])
+    if True:
+        model = resnet18(pretrained = True)
+        model.createLineals(2, args['ways'])
+    else:
+        model = OmniglotCNN(args['ways'])
     model.to(device)
 
     print("Getting Meta Algorithm")

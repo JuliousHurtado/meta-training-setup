@@ -9,6 +9,7 @@ from methods.maml import MAML
 from methods.meta_sgd import MetaSGD
 from methods.proto_net import ProtoNet
 from methods.transferMeta import TMAML
+from methods.meta_restnet import MetaRestNet
 
 from data.datasets.full_omniglot import FullOmniglot
 from data.datasets.mini_imagenet import MiniImagenet
