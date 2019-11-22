@@ -72,7 +72,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def getMetaAlgorithm(args, model):
+def getMetaAlgorithm(args, model, device):
     if args['algorithm'] == 'maml':
         meta_model = MAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
                                 device = device,

@@ -59,10 +59,6 @@ def cloneModel(args, model):
 def main(args):
     # Create Datasets
     generators = {'mini-imagenet': None, 'omniglot': None}
-
-    print("Reading datasets", flush=True)
-    generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
     
     # Create model
     print("Creating Model", flush=True)
@@ -74,7 +70,7 @@ def main(args):
     model.to(device)
 
     print("Getting Meta Algorithm", flush=True)
-    meta_model = getMetaAlgorithm(args, model)
+    meta_model = getMetaAlgorithm(args, model, device)
     
     print("Obtaining optimizer", flush=True)
     opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
@@ -82,6 +78,10 @@ def main(args):
         loss = nn.NLLLoss()
     else:
         loss = nn.CrossEntropyLoss(reduction='mean')
+
+    print("Reading datasets", flush=True)
+    generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])#getDatasets('mini-imagenet', args['ways'])
+    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
 
     results = {
         'train_acc': [],
