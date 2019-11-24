@@ -7,10 +7,12 @@ import torch as th
 from torch import nn
 from torch import optim
 
+from model.adam import Adam
+
 from model.omniglot_cnn import OmniglotCNN
 from model.resnet import resnet18
 
-from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm
+from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm, getRandomDataset
 
 from copy import deepcopy
 
@@ -73,18 +75,18 @@ def main(args):
     meta_model = getMetaAlgorithm(args, model, device)
     
     print("Obtaining optimizer", flush=True)
-    opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
+    opt = Adam(meta_model.parameters(), args['meta_lr'])
     if args['algorithm'] == 'protonet':
         loss = nn.NLLLoss()
     else:
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    #generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])#getDatasets('mini-imagenet', args['ways'])
-    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])
+    generators['omniglot'] = getDatasets('omniglot', args['ways'])
 
-    generators['mini-imagenet'] = getRandomDataset(args['ways'])
-    generators['omniglot'] = getRandomDataset(args['ways'])
+    #generators['mini-imagenet'] = getRandomDataset(args['ways'])
+    #generators['omniglot'] = getRandomDataset(args['ways'])
 
     results = {
         'train_acc': [],
@@ -99,8 +101,6 @@ def main(args):
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
         test_generator = generators[dataset][2]
-
-        opt = optim.SGD(meta_model.parameters(), args['meta_lr'])
         
         for iteration in range(args['num_iterations']):
             opt.zero_grad()
@@ -115,7 +115,7 @@ def main(args):
                 learner = cloneModel(args, meta_model)
 
                 evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
-                meta_model.printParam()
+                #meta_model.printParam()
                 
                 evaluation_error.backward()
                 if args['algorithm'] == 'tmaml':
@@ -142,9 +142,11 @@ def main(args):
                 if args['algorithm'] == 'tmaml':
                     meta_model.setMask()
                 for p in meta_model.parameters():
-                    p.grad.data.mul_(1.0 / args['meta_batch_size'])
+                    if p.grad is not None:
+                        p.grad.data.mul_(1.0 / args['meta_batch_size'])
+
                 opt.step()
-                meta_model.printParam()
+                #meta_model.printParam()
 
             if iteration % 20 == 0:
                 err = []
@@ -162,7 +164,7 @@ def main(args):
                 results['test_acc'].append(acc)
 
             # Print some metrics
-            if iteration % 50 == 0:
+            if iteration % 1 == 0:
                 print('\n')
                 print('Iteration', iteration)
                 print('Meta Train Error', meta_train_error / args['meta_batch_size'])

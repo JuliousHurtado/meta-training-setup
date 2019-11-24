@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import torch
 from torch.utils.data import Dataset, ConcatDataset
 from torchvision.datasets.omniglot import Omniglot
 
@@ -10,8 +10,8 @@ class RandomSet(Dataset):
     def __init__(self, root = '', transform=None, target_transform=None, download=False, to_color = False):
         self.transform = transform
 
-        self.x = torch.rand(1000, 224, 224, 3)
-        self.y = torch.randint(0, 50, (1000,))
+        self.x = torch.rand(500, 3, 224, 224)
+        self.y = torch.randint(0, 20, (500,))
 
     def __len__(self):
         return len(self.x)

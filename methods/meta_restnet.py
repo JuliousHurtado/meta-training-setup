@@ -48,18 +48,24 @@ class MetaRestNet(BaseLearner):
         self.device = device
         self.num_freeze_layers = num_freeze_layers
 
-        self.freeze_layers(num_freeze_layers)
-
-    def freeze_layers(self, num_layers):
-        self.module.conv1.required_grad = False
-        self.module.bn1.required_grad = False
+    def parameters(self):
+        temp = []
 
         layers = [self.module.layer1,self.module.layer2,
                     self.module.layer3,self.module.layer4]
 
-        for i in range(num_layers):
+        for i in range(self.num_freeze_layers, 4):
             for param in layers[i].parameters():
-                param.required_grad = False
+                temp.append(param)
+        #for param in self.module.parameters():
+        #    if param.required_grad:
+        #        temp.append(param)
+
+        for lin in self.module.linears[1:]:
+            for param in lin.parameters():
+                temp.append(param)
+
+        return temp
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
@@ -82,21 +88,23 @@ class MetaRestNet(BaseLearner):
                          self.module.fc.parameters(),
                          retain_graph=second_order,
                          create_graph=second_order)
+
         self.module.fc = maml_update(self.module.fc, self.lr, gradients)
 
     def clone(self, first_order=None):
         if first_order is None:
             first_order = self.first_order
         return MetaRestNet(clone_module(self.module),
-                    lr=self.lr,
+                    lr = self.lr,
                     adaptation_steps = self.adaptation_steps, 
                     device = self.device,
-                    first_order=first_order,
-                    num_freeze_layers=self.num_freeze_layers)
+                    first_order = first_order,
+                    num_freeze_layers = self.num_freeze_layers)
 
     def setLinear(self, num_dataset, device):
         self.module.setLinear(num_dataset, device)
 
     def printParam(self):
         for i, param in enumerate(self.module.parameters()):
-            print("{}_{}".format(i, param.sum()))
+            if i in [0,50,60]:
+                print("Param: {}  SUM: {}".format(i, param.sum()))
