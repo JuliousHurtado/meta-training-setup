@@ -65,7 +65,7 @@ def main(args):
     # Create model
     print("Creating Model", flush=True)
     if True:
-        model = resnet18(pretrained = True)
+        model = resnet18(pretrained = args['pretrained'])
         model.createLineals(2, args['ways'])
     else:
         model = OmniglotCNN(args['ways'])
@@ -164,7 +164,7 @@ def main(args):
                 results['test_acc'].append(acc)
 
             # Print some metrics
-            if iteration % 1 == 0:
+            if iteration % 20 == 0:
                 print('\n')
                 print('Iteration', iteration)
                 print('Meta Train Error', meta_train_error / args['meta_batch_size'])
@@ -198,6 +198,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--freeze_block', default=1, type=int)
     parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-resnet'], type=str)
+    parser.add_argument('--pretrained', default=True, type=str2bool)
 
     #MAML
     parser.add_argument('--first_order', default=True, type=str2bool)
