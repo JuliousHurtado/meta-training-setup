@@ -15,13 +15,20 @@ from data.datasets.full_omniglot import FullOmniglot
 from data.datasets.mini_imagenet import MiniImagenet
 from data.datasets.randomSet import RandomSet
 
-def getRandomDataset(ways):
+from data.datasets.new_metaDataset import MetaDataset, TaskGenerator
+
+def getRandomDataset(ways, meta_training, num_new_cls = 1):
     tasks_list = [20, 10, 10]
     generators = {'train': None, 'validation': None, 'test': None}
     for mode, tasks in zip(['train','validation','test'], tasks_list):
         dataset = RandomSet()
-        dataset = l2l.data.MetaDataset(dataset)
-        generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
+        if meta_training:
+            dataset = MetaDataset(dataset)
+            dataset.create_groups(num_new_cls)
+            generators[mode] = TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
+        else:
+            dataset = l2l.data.MetaDataset(dataset)
+            generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
 
     return generators['train'], generators['validation'], generators['test']
 
@@ -67,6 +74,47 @@ def getDatasets(dataset, ways):
                                                 tasks=1024)
 
     return generators['train'], generators['validation'], generators['test']
+
+def getMetaTrainingSet(dataset, ways, num_new_cls):
+    tasks_list = [20000, 1024]
+    generators = {'train': None, 'validation': None}
+    if dataset == 'mini-imagenet':
+        for mode, tasks in zip(['train','validation'], tasks_list):
+            dataset = MiniImagenet(root='./data/data', mode=mode, 
+                                transform = transforms.Compose([
+                                    transforms.Resize(224, interpolation=LANCZOS),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                                ]))
+
+            dataset = MetaDataset(dataset)
+            dataset.create_groups(num_new_cls)
+            generators[mode] = TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
+    else:
+        omniglot = FullOmniglot(root='./data/data',
+                                                transform=transforms.Compose([
+                                                    l2l.vision.transforms.RandomDiscreteRotation(
+                                                        [0.0, 90.0, 180.0, 270.0]),
+                                                    transforms.Resize(224, interpolation=LANCZOS),
+                                                    transforms.ToTensor(),
+                                                    lambda x: 1.0 - x,
+                                                ]),
+                                                download=False, to_color = True)
+
+        omniglot = MetaDataset(omniglot)
+        omniglot.create_groups(num_new_cls)
+        classes = list(range(1623))
+        random.shuffle(classes)
+        generators['train'] = TaskGenerator(dataset=omniglot,
+                                                 ways=ways,
+                                                 classes=classes[:1100],
+                                                 tasks=20000)
+        generators['validation'] = TaskGenerator(dataset=omniglot,
+                                                 ways=ways,
+                                                 classes=classes[1100:1200],
+                                                 tasks=1024)
+
+    return generators['train'], generators['validation'], _
 
 def saveValues(name_file, results, args):
     th.save({

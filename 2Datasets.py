@@ -12,7 +12,7 @@ from model.adam import Adam
 from model.omniglot_cnn import OmniglotCNN
 from model.resnet import resnet18
 
-from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm, getRandomDataset
+from utils import getDatasets, saveValues, str2bool, getMetaAlgorithm, getRandomDataset, getMetaTrainingSet
 
 from copy import deepcopy
 
@@ -54,9 +54,72 @@ def adaptationProcess(args, generator, learner, loss):
     return evaluation_error, evaluation_accuracy
 
 def cloneModel(args, model):
-    if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml']:
+    if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml', 'meta-resnet']:
         return model.clone()
     return model
+
+def train_process(args, meta_model, loss, opt, train_generator, valid_generator, task_ind):
+    opt.zero_grad()
+    meta_train_error = 0.0
+    meta_train_accuracy = 0.0
+    meta_valid_error = 0.0
+    meta_valid_accuracy = 0.0
+
+    for task in range(args['meta_batch_size']):
+        # Compute meta-training loss
+        meta_model.setLinear(task_ind, device)
+        learner = cloneModel(args, meta_model)
+
+        evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
+        #meta_model.printParam()
+                
+        evaluation_error.backward()
+        if args['algorithm'] == 'tmaml':
+            meta_model.getGradients()
+
+        if args['algorithm'] in ['sgd', 'protonet']:
+            opt.step()
+            opt.zero_grad()
+
+        meta_train_error += evaluation_error.item()
+        meta_train_accuracy += evaluation_accuracy.item()
+
+        # Compute meta-validation loss
+        learner = cloneModel(args, meta_model)
+        evaluation_error, evaluation_accuracy = adaptationProcess(args, valid_generator, learner, loss)
+
+        meta_valid_error += evaluation_error.item()
+        meta_valid_accuracy += evaluation_accuracy.item()
+
+    # Average the accumulated gradients and optimize
+    #    meta_model.write_grads(valid_generator, opt, loss, args['shots'], args['meta_batch_size'])
+
+    if args['algorithm'] not in ['sgd', 'protonet']:
+        if args['algorithm'] == 'tmaml':
+            meta_model.setMask()
+        for p in meta_model.parameters():
+            if p.grad is not None:
+                p.grad.data.mul_(1.0 / args['meta_batch_size'])
+
+        opt.step()
+        #meta_model.printParam()
+
+    return meta_train_error, meta_valid_error, meta_train_accuracy, meta_valid_accuracy
+
+def test_process(args, meta_model, generators, loss):
+    err = []
+    acc = []
+    for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
+        test_generator = generators[dataset2][2]
+        # Compute meta-testing loss
+        meta_model.setLinear(j, device)
+        learner = cloneModel(args, meta_model)
+        evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+
+        err.append(evaluation_error.item())
+        acc.append(evaluation_accuracy.item())
+
+    return err, acc
 
 def main(args):
     # Create Datasets
@@ -82,11 +145,11 @@ def main(args):
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    generators['mini-imagenet'] = getDatasets('omniglot', args['ways'])
+    generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
     generators['omniglot'] = getDatasets('omniglot', args['ways'])
 
-    #generators['mini-imagenet'] = getRandomDataset(args['ways'])
-    #generators['omniglot'] = getRandomDataset(args['ways'])
+    #generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
+    #generators['omniglot'] = getRandomDataset(args['ways'], False)
 
     results = {
         'train_acc': [],
@@ -100,84 +163,63 @@ def main(args):
     for i,dataset in enumerate(['mini-imagenet','omniglot']): # 
         train_generator = generators[dataset][0]
         valid_generator = generators[dataset][1]
-        test_generator = generators[dataset][2]
         
-        for iteration in range(args['num_iterations']):
-            opt.zero_grad()
-            meta_train_error = 0.0
-            meta_train_accuracy = 0.0
-            meta_valid_error = 0.0
-            meta_valid_accuracy = 0.0
+        if args['meta_training']:
+            for iteration in range(args['num_set_train']-1):
+                meta_train_generator, meta_valid_generator, _ = getMetaTrainingSet(dataset, args['ways'], args['num_new_cls'])
+                #meta_train_generator, meta_valid_generator, _ = getRandomDataset(args['ways'], args['meta_training'], args['num_new_cls'])
 
-            for task in range(args['meta_batch_size']):
-                # Compute meta-training loss
-                meta_model.setLinear(i, device)
-                learner = cloneModel(args, meta_model)
+                for iteration in range(int(args['num_iterations']/args['num_set_train'])):
+                    t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, meta_train_generator, meta_valid_generator, i)
 
-                evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
-                #meta_model.printParam()
-                
-                evaluation_error.backward()
-                if args['algorithm'] == 'tmaml':
-                    meta_model.getGradients()
+            for iteration in range(int(args['num_iterations']/args['num_set_train'])):
+                t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
-                if args['algorithm'] in ['sgd', 'protonet']:
-                    opt.step()
-                    opt.zero_grad()
+                if iteration % 1 == 0:
+                    err, acc = test_process(args, meta_model, generators, loss)
+                    results['test_loss'].append(err)
+                    results['test_acc'].append(acc)
 
-                meta_train_error += evaluation_error.item()
-                meta_train_accuracy += evaluation_accuracy.item()
+                # Print some metrics
+                if iteration % 1 == 0:
+                    print('\n')
+                    print('Iteration', iteration)
+                    print('Meta Train Error', t_error / args['meta_batch_size'])
+                    print('Meta Train Accuracy', t_acc / args['meta_batch_size'])
 
-                # Compute meta-validation loss
-                learner = cloneModel(args, meta_model)
-                evaluation_error, evaluation_accuracy = adaptationProcess(args, valid_generator, learner, loss)
+                    print('Meta Valid Error', v_error / args['meta_batch_size'])
+                    print('Meta Valid Accuracy', v_acc / args['meta_batch_size'], flush=True)
+            
+                results['train_loss'].append(t_error / args['meta_batch_size'])
+                results['train_acc'].append(t_acc / args['meta_batch_size'])
 
-                meta_valid_error += evaluation_error.item()
-                meta_valid_accuracy += evaluation_accuracy.item()
+                results['val_loss'].append(v_error / args['meta_batch_size'])
+                results['val_acc'].append(v_acc / args['meta_batch_size'])
 
-            # Average the accumulated gradients and optimize
-            #    meta_model.write_grads(valid_generator, opt, loss, args['shots'], args['meta_batch_size'])
+        else:
+            for iteration in range(args['num_iterations']):
+                t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
-            if args['algorithm'] not in ['sgd', 'protonet']:
-                if args['algorithm'] == 'tmaml':
-                    meta_model.setMask()
-                for p in meta_model.parameters():
-                    if p.grad is not None:
-                        p.grad.data.mul_(1.0 / args['meta_batch_size'])
+                if iteration % 20 == 0:
+                    err, acc = test_process(args, meta_model, generators, loss)
+                    results['test_loss'].append(err)
+                    results['test_acc'].append(acc)
 
-                opt.step()
-                #meta_model.printParam()
+                # Print some metrics
+                if iteration % 20 == 0:
+                    print('\n')
+                    print('Iteration', iteration)
+                    print('Meta Train Error', t_error / args['meta_batch_size'])
+                    print('Meta Train Accuracy', t_acc / args['meta_batch_size'])
 
-            if iteration % 20 == 0:
-                err = []
-                acc = []
-                for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
-                    test_generator = generators[dataset2][2]
-                    # Compute meta-testing loss
-                    meta_model.setLinear(j, device)
-                    learner = cloneModel(args, meta_model)
-                    evaluation_error, evaluation_accuracy = adaptationProcess(args, test_generator, learner, loss)
+                    print('Meta Valid Error', v_error / args['meta_batch_size'])
+                    print('Meta Valid Accuracy', v_acc / args['meta_batch_size'], flush=True)
+            
+                results['train_loss'].append(t_error / args['meta_batch_size'])
+                results['train_acc'].append(t_acc / args['meta_batch_size'])
 
-                    err.append(evaluation_error.item())
-                    acc.append(evaluation_accuracy.item())
-                results['test_loss'].append(err)
-                results['test_acc'].append(acc)
-
-            # Print some metrics
-            if iteration % 20 == 0:
-                print('\n')
-                print('Iteration', iteration)
-                print('Meta Train Error', meta_train_error / args['meta_batch_size'])
-                print('Meta Train Accuracy', meta_train_accuracy / args['meta_batch_size'])
-
-                print('Meta Valid Error', meta_valid_error / args['meta_batch_size'])
-                print('Meta Valid Accuracy', meta_valid_accuracy / args['meta_batch_size'], flush=True)
-        
-            results['train_loss'].append(meta_train_error / args['meta_batch_size'])
-            results['train_acc'].append(meta_train_accuracy / args['meta_batch_size'])
-
-            results['val_loss'].append(meta_valid_error / args['meta_batch_size'])
-            results['val_acc'].append(meta_valid_accuracy / args['meta_batch_size'])
+                results['val_loss'].append(v_error / args['meta_batch_size'])
+                results['val_acc'].append(v_acc / args['meta_batch_size'])
 
     file_path = 'results/2datasets_{}_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
                                                                 args['shots'], args['ways'], 
@@ -185,7 +227,6 @@ def main(args):
     saveValues(file_path, results, args)
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
     #Global
     parser.add_argument('--ways', default=5, type=int)
@@ -199,6 +240,11 @@ if __name__ == '__main__':
     parser.add_argument('--freeze_block', default=1, type=int)
     parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-resnet'], type=str)
     parser.add_argument('--pretrained', default=True, type=str2bool)
+
+    #Meta Train
+    parser.add_argument('--meta_training', default=False, type=str2bool)
+    parser.add_argument('--num_set_train', default=5, type=int)
+    parser.add_argument('--num_new_cls', default=30, type=int)
 
     #MAML
     parser.add_argument('--first_order', default=True, type=str2bool)
