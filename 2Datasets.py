@@ -175,13 +175,13 @@ def main(args):
             for iteration in range(int(args['num_iterations']/args['num_set_train'])):
                 t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
-                if iteration % 1 == 0:
+                if iteration % 10 == 0:
                     err, acc = test_process(args, meta_model, generators, loss)
                     results['test_loss'].append(err)
                     results['test_acc'].append(acc)
 
                 # Print some metrics
-                if iteration % 1 == 0:
+                if iteration % 20 == 0:
                     print('\n')
                     print('Iteration', iteration)
                     print('Meta Train Error', t_error / args['meta_batch_size'])
@@ -250,7 +250,7 @@ if __name__ == '__main__':
     parser.add_argument('--first_order', default=True, type=str2bool)
 
     #Transfer
-    parser.add_argument('--min_used', default=0.0, type=float)
+    # parser.add_argument('--min_used', default=0.0, type=float)
 
     # ProtoNet
     parser.add_argument('--distance', default='l2')

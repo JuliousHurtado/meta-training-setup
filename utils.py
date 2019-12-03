@@ -114,7 +114,7 @@ def getMetaTrainingSet(dataset, ways, num_new_cls):
                                                  classes=classes[1100:1200],
                                                  tasks=1024)
 
-    return generators['train'], generators['validation'], _
+    return generators['train'], generators['validation'], None
 
 def saveValues(name_file, results, args):
     th.save({
