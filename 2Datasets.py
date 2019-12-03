@@ -54,7 +54,7 @@ def adaptationProcess(args, generator, learner, loss):
     return evaluation_error, evaluation_accuracy
 
 def cloneModel(args, model):
-    if args['algorithm'] in ['maml', 'meta-sgd', 'tmaml', 'meta-resnet']:
+    if args['algorithm'] in ['maml', 'meta-sgd', 'meta-resnet']:
         return model.clone()
     return model
 
@@ -71,12 +71,9 @@ def train_process(args, meta_model, loss, opt, train_generator, valid_generator,
         learner = cloneModel(args, meta_model)
 
         evaluation_error, evaluation_accuracy = adaptationProcess(args, train_generator, learner, loss)
-        #meta_model.printParam()
+        # meta_model.printParam()
                 
         evaluation_error.backward()
-        if args['algorithm'] == 'tmaml':
-            meta_model.getGradients()
-
         if args['algorithm'] in ['sgd', 'protonet']:
             opt.step()
             opt.zero_grad()
@@ -95,8 +92,6 @@ def train_process(args, meta_model, loss, opt, train_generator, valid_generator,
     #    meta_model.write_grads(valid_generator, opt, loss, args['shots'], args['meta_batch_size'])
 
     if args['algorithm'] not in ['sgd', 'protonet']:
-        if args['algorithm'] == 'tmaml':
-            meta_model.setMask()
         for p in meta_model.parameters():
             if p.grad is not None:
                 p.grad.data.mul_(1.0 / args['meta_batch_size'])
@@ -145,11 +140,11 @@ def main(args):
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    #generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
+    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
 
-    #generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
-    #generators['omniglot'] = getRandomDataset(args['ways'], False)
+    generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
+    generators['omniglot'] = getRandomDataset(args['ways'], False)
 
     results = {
         'train_acc': [],
@@ -224,7 +219,7 @@ def main(args):
     file_path = 'results/2datasets_{}_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
                                                                 args['shots'], args['ways'], 
                                                                 args['first_order'], args['min_used'])
-    saveValues(file_path, results, args)
+    #saveValues(file_path, results, args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -237,9 +232,11 @@ if __name__ == '__main__':
     parser.add_argument('--adaptation_steps', default=5, type=int)
     parser.add_argument('--num_iterations', default=20000, type=int)
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--freeze_block', default=1, type=int)
-    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'tmaml', 'meta-resnet'], type=str)
+    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'meta-resnet'], type=str)
     parser.add_argument('--pretrained', default=True, type=str2bool)
+
+    #Meta Transfer
+    parser.add_argument('--freeze_block', default=1, type=int)
 
     #Meta Train
     parser.add_argument('--meta_training', default=False, type=str2bool)
@@ -248,9 +245,6 @@ if __name__ == '__main__':
 
     #MAML
     parser.add_argument('--first_order', default=True, type=str2bool)
-
-    #Transfer
-    # parser.add_argument('--min_used', default=0.0, type=float)
 
     # ProtoNet
     parser.add_argument('--distance', default='l2')

@@ -57,7 +57,7 @@ class MetaDataset(Dataset):
         count = 0
         for i in range(0, len(labels), int(len(labels)/num_new_cls)):
             for j in range(int(len(labels)/num_new_cls)):
-                if i+j > len(labels):
+                if i+j >= len(labels):
                     break
                 self.classes_to_classes[labels[i+j]] = count
                 self.new_label_to_index[count].extend(self.labels_to_indices[labels[i+j]])

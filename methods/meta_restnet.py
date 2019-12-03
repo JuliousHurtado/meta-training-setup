@@ -3,6 +3,9 @@
 import torch as th
 from torch import nn
 from torch.autograd import grad
+from torch import optim
+
+import copy
 
 from learn2learn.algorithms.base_learner import BaseLearner
 from learn2learn.utils import clone_module
@@ -41,12 +44,13 @@ class MetaRestNet(BaseLearner):
     def __init__(self, model, lr, adaptation_steps = 1, device = 'cpu', 
                         first_order=False, num_freeze_layers = 1):
         super(MetaRestNet, self).__init__()
-        self.module = model
         self.lr = lr
         self.first_order = first_order
         self.adaptation_steps = adaptation_steps
         self.device = device
         self.num_freeze_layers = num_freeze_layers
+
+        self.module = model
 
     def parameters(self):
         temp = []
@@ -61,7 +65,7 @@ class MetaRestNet(BaseLearner):
         #    if param.required_grad:
         #        temp.append(param)
 
-        for lin in self.module.linears[1:]:
+        for lin in self.module.linears:#[1:]:
             for param in lin.parameters():
                 temp.append(param)
 
