@@ -54,6 +54,7 @@ def getDatasets(dataset, ways):
                                                     transforms.Resize(224, interpolation=LANCZOS),
                                                     transforms.ToTensor(),
                                                     lambda x: 1.0 - x,
+                                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                                                 ]),
                                                 download=False, to_color = True)
 
@@ -98,6 +99,7 @@ def getMetaTrainingSet(dataset, ways, num_new_cls):
                                                     transforms.Resize(224, interpolation=LANCZOS),
                                                     transforms.ToTensor(),
                                                     lambda x: 1.0 - x,
+                                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                                                 ]),
                                                 download=False, to_color = True)
 
