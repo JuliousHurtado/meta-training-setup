@@ -147,14 +147,7 @@ def getMetaAlgorithm(args, model, device):
         meta_model = ProtoNet(model, device = device,
                                 k_way = args['ways'],
                                 n_shot = args['shots'])
-    elif args['algorithm'] == 'tmaml':
-        if args['min_used'] > 1:
-            args['min_used'] = 1
-        meta_model = TMAML(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
-                                min_used = args['meta_batch_size']*args['min_used'],
-                                device = device,
-                                first_order=args['first_order'])
-    elif args['algorithm'] == 'meta-resnet':
+    elif args['algorithm'] == 'meta-transfer':
         meta_model = MetaRestNet(model, lr=args['fast_lr'], adaptation_steps = args['adaptation_steps'], 
                                 device = device, first_order=args['first_order'],
                                 num_freeze_layers = args['freeze_block'])

@@ -54,17 +54,17 @@ class FullOmniglot(Dataset):
                                    download=download,
                                    target_transform=lambda x: x + len(omni_background._characters))
 
-        self.dataset = ConcatDataset((omni_background, omni_evaluation))
+        self.dataset = [ (self.transform(self.toColor(x)),y) for x,y in ConcatDataset((omni_background, omni_evaluation)) ] 
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, item):
         image, character_class = self.dataset[item]
-        if self.to_color:
-            image = self.toColor(image)
-        if self.transform:
-            image = self.transform(image)
+        #if self.to_color:
+        #    image = self.toColor(image)
+        #if self.transform:
+        #    image = self.transform(image)
 
         if self.target_transform:
             character_class = self.target_transform(character_class)

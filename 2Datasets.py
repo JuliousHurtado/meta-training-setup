@@ -54,7 +54,7 @@ def adaptationProcess(args, generator, learner, loss):
     return evaluation_error, evaluation_accuracy
 
 def cloneModel(args, model):
-    if args['algorithm'] in ['maml', 'meta-sgd', 'meta-resnet']:
+    if args['algorithm'] in ['maml', 'meta-sgd', 'meta-transfer']:
         return model.clone()
     return model
 
@@ -140,11 +140,11 @@ def main(args):
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    #generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    #generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
+    generators['omniglot'] = getDatasets('omniglot', args['ways'])
 
-    generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
-    generators['omniglot'] = getRandomDataset(args['ways'], False)
+    #generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
+    #generators['omniglot'] = getRandomDataset(args['ways'], False)
 
     results = {
         'train_acc': [],
@@ -167,7 +167,7 @@ def main(args):
                 for iteration in range(int(args['num_iterations']/args['num_set_train'])):
                     t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, meta_train_generator, meta_valid_generator, i)
 
-            for iteration in range(int(args['num_iterations']/args['num_set_train'])):
+            for iteration in range(args['num_iterations']):
                 t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
                 if iteration % 10 == 0:
@@ -176,7 +176,7 @@ def main(args):
                     results['test_acc'].append(acc)
 
                 # Print some metrics
-                if iteration % 20 == 0:
+                if iteration % 50 == 0:
                     print('\n')
                     print('Iteration', iteration)
                     print('Meta Train Error', t_error / args['meta_batch_size'])
@@ -195,13 +195,13 @@ def main(args):
             for iteration in range(args['num_iterations']):
                 t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
-                if iteration % 20 == 0:
+                if iteration % 10 == 0:
                     err, acc = test_process(args, meta_model, generators, loss)
                     results['test_loss'].append(err)
                     results['test_acc'].append(acc)
 
                 # Print some metrics
-                if iteration % 20 == 0:
+                if iteration % 50 == 0:
                     print('\n')
                     print('Iteration', iteration)
                     print('Meta Train Error', t_error / args['meta_batch_size'])
@@ -216,10 +216,10 @@ def main(args):
                 results['val_loss'].append(v_error / args['meta_batch_size'])
                 results['val_acc'].append(v_acc / args['meta_batch_size'])
 
-    file_path = 'results/2datasets_{}_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
+    file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
                                                                 args['shots'], args['ways'], 
-                                                                args['first_order'], args['min_used'])
-    #saveValues(file_path, results, args)
+                                                                args['first_order'])
+    saveValues(file_path, results, args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -230,9 +230,9 @@ if __name__ == '__main__':
     parser.add_argument('--fast_lr', default=0.5, type=float)
     parser.add_argument('--meta_batch_size', default=32, type=int)
     parser.add_argument('--adaptation_steps', default=5, type=int)
-    parser.add_argument('--num_iterations', default=20000, type=int)
+    parser.add_argument('--num_iterations', default=500, type=int)
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'meta-resnet'], type=str)
+    parser.add_argument('--algorithm', choices=['maml', 'meta-sgd','sgd', 'protonet', 'meta-transfer'], type=str)
     parser.add_argument('--pretrained', default=True, type=str2bool)
 
     #Meta Transfer
