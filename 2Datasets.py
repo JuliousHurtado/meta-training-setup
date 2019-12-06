@@ -105,7 +105,7 @@ def test_process(args, meta_model, generators, loss):
     err = []
     acc = []
     for j,dataset2 in enumerate(['mini-imagenet', 'omniglot']):
-        test_generator = generators[dataset2][2]
+        test_generator = generators[dataset2]
         # Compute meta-testing loss
         meta_model.setLinear(j, device)
         learner = cloneModel(args, meta_model)
@@ -118,7 +118,7 @@ def test_process(args, meta_model, generators, loss):
 
 def main(args):
     # Create Datasets
-    generators = {'mini-imagenet': None, 'omniglot': None}
+    generators_test = {'mini-imagenet': None, 'omniglot': None}
     
     # Create model
     print("Creating Model", flush=True)
@@ -140,8 +140,8 @@ def main(args):
         loss = nn.CrossEntropyLoss(reduction='mean')
 
     print("Reading datasets", flush=True)
-    generators['mini-imagenet'] = getDatasets('mini-imagenet', args['ways'])
-    generators['omniglot'] = getDatasets('omniglot', args['ways'])
+    _,_,generators_test['mini-imagenet'],_ = getDatasets('mini-imagenet', args['ways'], ['test'])
+    _,_,generators_test['omniglot'],classes = getDatasets('omniglot', args['ways'], ['test'])
 
     #generators['mini-imagenet'] = getRandomDataset(args['ways'], False)
     #generators['omniglot'] = getRandomDataset(args['ways'], False)
@@ -156,22 +156,21 @@ def main(args):
 
     }
     for i,dataset in enumerate(['mini-imagenet','omniglot']): # 
-        train_generator = generators[dataset][0]
-        valid_generator = generators[dataset][1]
-        
         if args['meta_training']:
             for iteration in range(args['num_set_train']-1):
-                meta_train_generator, meta_valid_generator, _ = getMetaTrainingSet(dataset, args['ways'], args['num_new_cls'])
+                meta_train_generator, meta_valid_generator, _ = getMetaTrainingSet(dataset, args['ways'], args['num_new_cls'], classes)
                 #meta_train_generator, meta_valid_generator, _ = getRandomDataset(args['ways'], args['meta_training'], args['num_new_cls'])
 
                 for iteration in range(int(args['num_iterations']/args['num_set_train'])):
                     t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, meta_train_generator, meta_valid_generator, i)
 
+            train_generator,valid_generator,_,_ = getDatasets(dataset, args['ways'], ['train','validation'], classes)
+            
             for iteration in range(args['num_iterations']):
                 t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
                 if iteration % 10 == 0:
-                    err, acc = test_process(args, meta_model, generators, loss)
+                    err, acc = test_process(args, meta_model, generators_test, loss)
                     results['test_loss'].append(err)
                     results['test_acc'].append(acc)
 
@@ -192,11 +191,12 @@ def main(args):
                 results['val_acc'].append(v_acc / args['meta_batch_size'])
 
         else:
+            train_generator,valid_generator,_,_ = getDatasets(dataset, args['ways'], ['train','validation'], classes)
             for iteration in range(args['num_iterations']):
                 t_error, v_error, t_acc, v_acc = train_process(args, meta_model, loss, opt, train_generator, valid_generator, i)
 
                 if iteration % 10 == 0:
-                    err, acc = test_process(args, meta_model, generators, loss)
+                    err, acc = test_process(args, meta_model, generators_test, loss)
                     results['test_loss'].append(err)
                     results['test_acc'].append(acc)
 
@@ -216,9 +216,8 @@ def main(args):
                 results['val_loss'].append(v_error / args['meta_batch_size'])
                 results['val_acc'].append(v_acc / args['meta_batch_size'])
 
-    file_path = 'results/2datasets_{}_{}_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
-                                                                args['shots'], args['ways'], 
-                                                                args['first_order'])
+    file_path = 'results/2datasets_{}_{}_{}.pth'.format(str(time.time()), args['algorithm'], 
+                                                                args['meta_training'])
     saveValues(file_path, results, args)
 
 if __name__ == '__main__':

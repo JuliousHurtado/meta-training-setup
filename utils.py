@@ -32,11 +32,11 @@ def getRandomDataset(ways, meta_training, num_new_cls = 1):
 
     return generators['train'], generators['validation'], generators['test']
 
-def getDatasets(dataset, ways):
-    tasks_list = [20000, 1024, 1024]
+def getDatasets(dataset, ways, mode_list = [], classes = None):
     generators = {'train': None, 'validation': None, 'test': None}
     if dataset == 'mini-imagenet':
-        for mode, tasks in zip(['train','validation','test'], tasks_list):
+        tasks_list = {'train': 20000, 'validation': 1024, 'test': 1024}
+        for mode in mode_list:
             dataset = MiniImagenet(root='./data/data', mode=mode, 
                                 transform = transforms.Compose([
                                     transforms.Resize(224, interpolation=LANCZOS),
@@ -45,7 +45,8 @@ def getDatasets(dataset, ways):
                                 ]))
 
             dataset = l2l.data.MetaDataset(dataset)
-            generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks)
+            generators[mode] = l2l.data.TaskGenerator(dataset=dataset, ways=ways, tasks=tasks_list[mode])
+        classes = None
     else:
         omniglot = FullOmniglot(root='./data/data',
                                                 transform=transforms.Compose([
@@ -59,24 +60,28 @@ def getDatasets(dataset, ways):
                                                 download=False, to_color = True)
 
         omniglot = l2l.data.MetaDataset(omniglot)
-        classes = list(range(1623))
-        random.shuffle(classes)
-        generators['train'] = l2l.data.TaskGenerator(dataset=omniglot,
+        if classes is None:
+            classes = list(range(1623))
+            random.shuffle(classes)
+        if 'train' in mode_list:
+            generators['train'] = l2l.data.TaskGenerator(dataset=omniglot,
                                                  ways=ways,
                                                  classes=classes[:1100],
                                                  tasks=20000)
-        generators['validation'] = l2l.data.TaskGenerator(dataset=omniglot,
+        if 'validation' in mode_list:
+            generators['validation'] = l2l.data.TaskGenerator(dataset=omniglot,
                                                  ways=ways,
                                                  classes=classes[1100:1200],
                                                  tasks=1024)
-        generators['test'] = l2l.data.TaskGenerator(dataset=omniglot,
+        if 'test' in mode_list:
+            generators['test'] = l2l.data.TaskGenerator(dataset=omniglot,
                                                 ways=ways,
                                                 classes=classes[1200:],
                                                 tasks=1024)
 
-    return generators['train'], generators['validation'], generators['test']
+    return generators['train'], generators['validation'], generators['test'], classes
 
-def getMetaTrainingSet(dataset, ways, num_new_cls):
+def getMetaTrainingSet(dataset, ways, num_new_cls, classes = None):
     tasks_list = [20000, 1024]
     generators = {'train': None, 'validation': None}
     if dataset == 'mini-imagenet':
@@ -105,8 +110,9 @@ def getMetaTrainingSet(dataset, ways, num_new_cls):
 
         omniglot = MetaDataset(omniglot)
         omniglot.create_groups(num_new_cls)
-        classes = list(range(1623))
-        random.shuffle(classes)
+        if classes is None:
+            classes = list(range(1623))
+            random.shuffle(classes)
         generators['train'] = TaskGenerator(dataset=omniglot,
                                                  ways=ways,
                                                  classes=classes[:1100],
