@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-
-import torch as th
-from torch import nn
+import torch
 from torch.autograd import grad
 
 from learn2learn.algorithms.base_learner import BaseLearner
@@ -10,6 +8,7 @@ from learn2learn.utils import clone_module
 
 def maml_update(model, lr, grads=None):
     """
+    [[Source]](https://github.com/learnables/learn2learn/blob/master/learn2learn/algorithms/maml.py)
     **Description**
     Performs a MAML update on model using grads and lr.
     The function re-routes the Python object, thus avoiding in-place
@@ -70,9 +69,12 @@ class MAML(BaseLearner):
     **Arguments**
     * **model** (Module) - Module to be wrapped.
     * **lr** (float) - Fast adaptation learning rate.
-    * **first_order** (bool, *optional*, default=False) - Whether to use the
+    * **first_order** (bool, *optional*, default=False) - Whether to use the first-order
+        approximation of MAML. (FOMAML)
+    * **allow_unused** (bool, *optional*, default=False) - Whether to allow differentiation
+        of unused parameters.
     **References**
-    1. Finn et al. 2017. “Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks.”
+    1. Finn et al. 2017. "Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks."
     **Example**
     ~~~python
     linear = l2l.algorithms.MAML(nn.Linear(20, 10), lr=0.01)
@@ -84,28 +86,18 @@ class MAML(BaseLearner):
     ~~~
     """
 
-    def __init__(self, model, lr, adaptation_steps = 1, device = 'cpu', first_order=False):
+    def __init__(self, model, lr, freeze_layer = [],first_order=False, allow_unused=False):
         super(MAML, self).__init__()
         self.module = model
         self.lr = lr
         self.first_order = first_order
-        self.adaptation_steps = adaptation_steps
-        self.device = device
+        self.allow_unused = allow_unused
+        self.freeze_layer = freeze_layer
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
 
-    def meta_train(self, adaptation_data, evaluation_data, loss):
-        for step in range(self.adaptation_steps):
-            data = [d for d in adaptation_data]
-            X = th.cat([d[0].unsqueeze(0) for d in data], dim=0).to(self.device)
-            # X = th.cat([d[0] for d in data], dim=0).to(device)
-            y = th.cat([th.tensor(d[1]).view(-1) for d in data], dim=0).to(self.device)
-            train_error = loss(self.forward(X), y)
-            train_error /= len(adaptation_data)
-            self.adapt(train_error)
-
-    def adapt(self, loss, first_order=None):
+    def adapt(self, loss, first_order=None, allow_unused=None):
         """
         **Description**
         Updates the clone parameters in place using the MAML update.
@@ -113,17 +105,25 @@ class MAML(BaseLearner):
         * **loss** (Tensor) - Loss to minimize upon update.
         * **first_order** (bool, *optional*, default=None) - Whether to use first- or
             second-order updates. Defaults to self.first_order.
+        * **allow_unused** (bool, *optional*, default=None) - Whether to allow differentiation
+        of unused parameters. Defaults to self.allow_unused.
         """
         if first_order is None:
             first_order = self.first_order
+        if allow_unused is None:
+            allow_unused = self.allow_unused
         second_order = not first_order
         gradients = grad(loss,
-                         self.module.parameters(),
+                         #self.module.parameters(),
+                         self.getParams(),
                          retain_graph=second_order,
-                         create_graph=second_order)
+                         create_graph=second_order,
+                         allow_unused=allow_unused)
+
+        gradients = self.completeGradient(gradients)
         self.module = maml_update(self.module, self.lr, gradients)
 
-    def clone(self, first_order=None):
+    def clone(self, first_order=None, allow_unused=None):
         """
         **Description**
         Returns a `MAML`-wrapped copy of the module whose parameters and buffers
@@ -134,14 +134,52 @@ class MAML(BaseLearner):
         **Arguments**
         * **first_order** (bool, *optional*, default=None) - Whether the clone uses first-
             or second-order updates. Defaults to self.first_order.
+        * **allow_unused** (bool, *optional*, default=None) - Whether to allow differentiation
+        of unused parameters. Defaults to self.allow_unused.
         """
         if first_order is None:
             first_order = self.first_order
+        if allow_unused is None:
+            allow_unused = self.allow_unused
         return MAML(clone_module(self.module),
                     lr=self.lr,
-                    adaptation_steps = self.adaptation_steps, 
-                    device = self.device,
-                    first_order=first_order)
+                    freeze_layer=self.freeze_layer,
+                    first_order=first_order,
+                    allow_unused=allow_unused)
 
-    def setLinear(self, num_dataset, device):
-        self.module.setLinear(num_dataset, device)
+    def getParams(self):
+        if len(self.freeze_layer) == 0:
+            return self.module.parameters()
+        else:
+            params = []
+            for name, param in self.module.named_parameters():
+                if name[5] == 'r' or int(name[5]) not in self.freeze_layer:
+                    params.append(param)
+
+            return params
+
+    def completeGradient(self, gradients):
+        if len(self.freeze_layer) == 0:
+            return gradients
+        else:
+            grads = []
+            i = 0
+            for name, param in self.module.named_parameters():
+                if name[5] == 'r' or int(name[5]) not in self.freeze_layer:
+                    grads.append(gradients[i])
+                    i += 1
+                else:
+                    grads.append(torch.zeros_like(param))
+
+
+            return grads
+
+    def printValue(self):
+        block = {}
+
+        for name, param in self.module.named_parameters():
+            if name[5] not in block:
+                block[name[5]] = 0
+            block[name[5]] += param.sum()
+
+        print(block)
