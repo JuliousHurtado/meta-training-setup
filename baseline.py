@@ -3,6 +3,7 @@
 import os
 import random
 import argparse
+import time
 
 import numpy as np
 import torch
@@ -17,7 +18,7 @@ from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 
 from method.maml import MAML
 
-from legacy.utils import getRandomDataset
+#from legacy.utils import getRandomDataset
 
 import traceback
 import warnings
@@ -151,7 +152,7 @@ def main(
         num_iterations=60000,
         cuda=True,
         seed=42,
-        parser=None,
+        args=None,
 ):
     opt = optim.Adam(meta_alg.parameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
@@ -240,8 +241,7 @@ def main(
             p.grad.data.mul_(1.0 / meta_batch_size)
         opt.step()
 
-    name_file = 'results/{}_{}'.format(str(time.time()),parser.algorithm)
-    args = vars(parser.parse_args())
+    name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
     saveValues(name_file, results, meta_alg.module, args)
 
 def str2bool(v):
@@ -287,9 +287,6 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, metavar='S',
                         help='random seed (default: 42)')
 
-    parser.add_argument('--download-location', type=str, default="/tmp/mnist", metavar='S',
-                        help='download location for train data (default : /tmp/mnist')
-
     parser.add_argument('--algorithm', type=str, default='MAML',
                         help='[MAML, ANIL]')
 
@@ -326,4 +323,4 @@ if __name__ == '__main__':
          adaptation_steps=args.fast_adaption_steps,
          num_iterations=args.iterations,
          seed=args.seed,
-         parser=parser)
+         args=vars(parser.parse_args()))
