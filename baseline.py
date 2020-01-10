@@ -17,6 +17,7 @@ from learn2learn.data.transforms import NWays, KShots, LoadData, RemapLabels, Co
 from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 
 from method.maml import MAML
+from method.regularizer import FilterReg, LinearReg
 
 #from legacy.utils import getRandomDataset
 
@@ -33,7 +34,7 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 warnings.showwarning = warn_with_traceback
 
 def saveValues(name_file, results, model, args):
-    th.save({
+    torch.save({
             'results': results,
             'args': args,
             'checkpoint': model.state_dict()
@@ -115,8 +116,17 @@ def getAlgorithm(algorithm, model, fast_lr, first_order, freeze_layer):
     else:
         raise Exception('Algorithm {} not supported'.format(algorithm))
 
+def getRegularizer(convFilter, c_theta, linearReg, c_omega):
+    regularizator = []
 
-def fast_adapt(batch, learner, loss, adaptation_steps, shots, ways, device):
+    if convFilter:
+        regularizator.append(FilterReg(c_theta))
+    if linearReg:
+        regularizator.append(LinearReg(c_omega))
+
+    return regularizator
+
+def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device):
     data, labels = batch
     data, labels = data.to(device), labels.to(device)
 
@@ -135,6 +145,11 @@ def fast_adapt(batch, learner, loss, adaptation_steps, shots, ways, device):
     # Evaluate the adapted model
     predictions = learner(evaluation_data)
     valid_error = loss(predictions, evaluation_labels)
+
+    if len(regs) > 0:
+         for reg in regs:
+            valid_error += reg(learner)
+
     valid_error /= len(evaluation_data)
     valid_accuracy = accuracy(predictions, evaluation_labels)
     return valid_error, valid_accuracy
@@ -143,6 +158,7 @@ def fast_adapt(batch, learner, loss, adaptation_steps, shots, ways, device):
 def main(
         meta_alg,
         data_generators,
+        regs,
         ways,
         shots,
         device,
@@ -181,6 +197,7 @@ def main(
             batch = data_generators['train'].sample()
             evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                learner,
+                                                               regs,
                                                                loss,
                                                                adaptation_steps,
                                                                shots,
@@ -197,6 +214,7 @@ def main(
             batch = data_generators['validation'].sample()
             evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                learner,
+                                                               regs,
                                                                loss,
                                                                adaptation_steps,
                                                                shots,
@@ -210,6 +228,7 @@ def main(
             batch = data_generators['test'].sample()
             evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                learner,
+                                                               regs,
                                                                loss,
                                                                adaptation_steps,
                                                                shots,
@@ -228,6 +247,7 @@ def main(
             print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
             print('Meta Test Error', meta_test_error / meta_batch_size)
             print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
+            print('\n', flush=True)
 
         results['train_loss'].append(meta_train_error / meta_batch_size)
         results['train_acc'].append(meta_train_accuracy / meta_batch_size)
@@ -241,8 +261,9 @@ def main(
             p.grad.data.mul_(1.0 / meta_batch_size)
         opt.step()
 
-    name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
-    saveValues(name_file, results, meta_alg.module, args)
+    if args['save_model']:
+        name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
+        saveValues(name_file, results, meta_alg.module, args)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
@@ -259,10 +280,10 @@ if __name__ == '__main__':
                         help='number of ways (default: 5)')
     parser.add_argument('--shots', type=int, default=5, metavar='N',
                         help='number of shots (default: 5)')
-    parser.add_argument('-tps', '--tasks-per-step', type=int, default=4, metavar='N',
-                        help='tasks per step (default: 4)')
-    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=10, metavar='N',
-                        help='steps per fast adaption (default: 10)')
+    parser.add_argument('-tps', '--tasks-per-step', type=int, default=32, metavar='N',
+                        help='tasks per step (default: 32)')
+    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
+                        help='steps per fast adaption (default: 5)')
 
     parser.add_argument('--iterations', type=int, default=30000, metavar='N',
                         help='number of iterations (default: 30000)')
@@ -274,25 +295,33 @@ if __name__ == '__main__':
 
     parser.add_argument('--lr', type=float, default=0.003, metavar='LR',
                         help='learning rate (default: 0.003)')
-    parser.add_argument('--fast-lr', type=float, default=0.01, metavar='LR',
+    parser.add_argument('--fast-lr', type=float, default=0.5, metavar='LR',
                         help='learning rate for MAML (default: 0.5)')
-    parser.add_argument('--first-order', type=str2bool, default=True, metavar='LR',
+    parser.add_argument('--first-order', type=str2bool, default=False, metavar='LR',
                         help='Using First order MAML')
     parser.add_argument('--freeze-layer', nargs='+', type=int, metavar='LR',
                         help='List of frozen layers')
-
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
 
     parser.add_argument('--seed', type=int, default=42, metavar='S',
                         help='random seed (default: 42)')
 
     parser.add_argument('--algorithm', type=str, default='MAML',
                         help='[MAML, ANIL]')
+    parser.add_argument('--filter-reg', type=str2bool, default=False,
+                        help='Using or not sparse-group regularization in conv filter (default False)')
+    parser.add_argument('--cost-theta', type=float, default=0.01,
+                        help='cost value of filter reg (default 0.01)')
+    parser.add_argument('--linear-reg', type=str2bool, default=False,
+                        help='Using or not sparse-group regularization in linear layer (default False)')
+    parser.add_argument('--cost-omega', type=float, default=0.01,
+                        help='cost value of linear reg (default 0.01)')
+
+    parser.add_argument('--save-model', type=str2bool, default=True, metavar='LR',
+                        help='save model (default True)')
 
     args = parser.parse_args()
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available()
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -306,15 +335,19 @@ if __name__ == '__main__':
 
     model = getModel(args.input_channel, args.ways, device)
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
-    
+    regs = getRegularizer( 
+                    args.filter_reg, args.cost_theta,
+                    args.linear_reg, args.cost_omega)
+
     # print(len(list(meta_model.getParams())))
 
     #print(model)
     data_generators = getDataset(args.dataset, args.ways, args.shots)
-    # data_generators = getRandomDataset(args.ways, False)
+    #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
          data_generators,
+         regs,
          ways=args.ways,
          shots=args.shots,
          device=device,
