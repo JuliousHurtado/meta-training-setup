@@ -92,6 +92,8 @@ class MAML(BaseLearner):
         self.lr = lr
         self.first_order = first_order
         self.allow_unused = allow_unused
+        if freeze_layer is None:
+            freeze_layer = []
         self.freeze_layer = freeze_layer
 
     def forward(self, *args, **kwargs):
