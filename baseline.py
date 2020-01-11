@@ -280,8 +280,8 @@ if __name__ == '__main__':
                         help='number of ways (default: 5)')
     parser.add_argument('--shots', type=int, default=5, metavar='N',
                         help='number of shots (default: 5)')
-    parser.add_argument('-tps', '--tasks-per-step', type=int, default=32, metavar='N',
-                        help='tasks per step (default: 32)')
+    parser.add_argument('-tps', '--tasks-per-step', type=int, default=8, metavar='N',
+                        help='tasks per step (default: 8)')
     parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
                         help='steps per fast adaption (default: 5)')
 
