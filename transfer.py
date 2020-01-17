@@ -8,23 +8,22 @@ import numpy as np
 import torch
 from torch import nn
 from torch import optim
+from torch.nn import functional as F
 from torchvision import transforms
-from torchvision.datasets import ImageFolder
+from torchvision.datasets import ImageFolder, SVHN, CIFAR10
 
 import learn2learn as l2l
 from learn2learn.data.transforms import NWays, KShots, LoadData, RemapLabels, ConsecutiveLabels
-from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
-
-from method.maml import MAML
-from method.regularizer import FilterReg, LinearReg
 
 from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer
 
-#from legacy.utils import getRandomDataset
+from legacy.utils import getRandomDataset
 
 import traceback
 import warnings
 import sys
+
+base_path = 'results/models'
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
 
@@ -38,56 +37,52 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
+def test(model, data_loader):
+    model.eval()
+    correct = 0
+    for input, target in data_loader:
+        input, target = input.to(device), target.to(device)
+        output = model(input)
+        correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
+    return correct.item() / len(data_loader.dataset)
+
 def getDataset(name_dataset, ways, shots):
     generators = {}
-    if name_dataset == 'Omniglot':
-        omniglot = l2l.vision.datasets.FullOmniglot(root='./data',
-                                                transform=transforms.Compose([
-                                                    transforms.Resize(28, interpolation=LANCZOS),
-                                                    transforms.ToTensor(),
-                                                    lambda x: 1.0 - x,
-                                                ]),
-                                                download=True)
-        dataset = l2l.data.MetaDataset(omniglot)
-        classes = list(range(1623))
-        random.shuffle(classes)
+    transform_data = transforms.Compose([
+            transforms.Resize(84),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+    if name_dataset == 'SVHN':
+        dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
 
-        for mode, num_tasks, split in zip(['train','validation','test'],
-                                        [20000,1024,1024],[[0,1100],[1100,1200],[1200,-1]]):
-
-            transforms = [
-                l2l.data.transforms.FilterLabels(dataset, classes[split[0]:split[1]]),
+        transforms = [
                 l2l.data.transforms.NWays(dataset, ways),
                 l2l.data.transforms.KShots(dataset, 2*shots),
                 l2l.data.transforms.LoadData(dataset),
-                l2l.data.transforms.RemapLabels(dataset),
-                l2l.data.transforms.ConsecutiveLabels(dataset),
-                l2l.vision.transforms.RandomClassRotation(dataset, [0.0, 90.0, 180.0, 270.0])
             ]
+        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset),
+                                       task_transforms=transforms)
 
-            generators[mode] = l2l.data.TaskDataset(dataset,
-                                       task_transforms=transforms,
-                                       num_tasks=num_tasks)
+        dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
+        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=64)
 
-    elif name_dataset == 'MiniImagenet':
-        train_dataset = None
-        for mode, num_tasks in zip(['train','validation','test'],[20000,600,600]):
-            dataset = l2l.data.MetaDataset(l2l.vision.datasets.MiniImagenet(root='./data', mode=mode))
+        dataset = SVHN('./data/', split='test', transform=transform_data, download=True)
+        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=64)
 
-            if train_dataset is None:
-                train_dataset = dataset
+    elif name_dataset == 'cifar10':
+        dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
+        dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
-            transforms = [
-                    NWays(dataset, ways),
-                    KShots(dataset, 2*shots),
-                    LoadData(dataset),
-                    RemapLabels(dataset),
-                    ConsecutiveLabels(train_dataset),
+        transforms = [
+                    NWays(dataset_train, ways),
+                    KShots(dataset_train, 2*shots),
+                    LoadData(dataset_train)
                 ]
 
-            generators[mode] = l2l.data.TaskDataset(dataset,
-                                       task_transforms=transforms,
-                                       num_tasks=num_tasks)
+        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), task_transforms=transforms)
+        generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
+        generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=64)
 
     else:
         raise Exception('Dataset {} not supported'.format(dataset))
@@ -122,6 +117,13 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     valid_accuracy = accuracy(predictions, evaluation_labels)
     return valid_error, valid_accuracy
 
+def loadModel(file_name, model, device, ways):
+    checkpoint = torch.load(os.path.join(base_path,file_name), map_location=device)
+
+    model.load_state_dict(checkpoint['checkpoint'])
+    model.linear = nn.Linear(model.linear.weight.size(1), ways, bias=True).to(device)
+
+    return model
 
 def main(
         meta_alg,
@@ -171,58 +173,30 @@ def main(
                                                                shots,
                                                                ways,
                                                                device)
-            #meta_alg.printValue()
-            #learner.printValue()
             evaluation_error.backward()
             meta_train_error += evaluation_error.item()
             meta_train_accuracy += evaluation_accuracy.item()
 
-            # Compute meta-validation loss
-            learner = meta_alg.clone()
-            batch = data_generators['validation'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            meta_valid_error += evaluation_error.item()
-            meta_valid_accuracy += evaluation_accuracy.item()
+        # Compute meta-validation loss
+        meta_valid_accuracy = test(meta_alg, data_generators['validation'])
 
-            # Compute meta-testing loss
-            learner = meta_alg.clone()
-            batch = data_generators['test'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            meta_test_error += evaluation_error.item()
-            meta_test_accuracy += evaluation_accuracy.item()
+        # Compute meta-testing loss
+        meta_test_accuracy = test(meta_alg, data_generators['test'])
 
-        if iteration % 100 == 0:
+        if iteration % 500 == 0:
             # Print some metrics
             print('\n')
             print('Iteration', iteration)
             print('Meta Train Error', meta_train_error / meta_batch_size)
             print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
-            print('Meta Valid Error', meta_valid_error / meta_batch_size)
-            print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
-            print('Meta Test Error', meta_test_error / meta_batch_size)
-            print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
+            print('Meta Valid Accuracy', meta_valid_accuracy)
+            print('Meta Test Accuracy', meta_test_accuracy)
             print('\n', flush=True)
 
         results['train_loss'].append(meta_train_error / meta_batch_size)
         results['train_acc'].append(meta_train_accuracy / meta_batch_size)
-        results['val_loss'].append(meta_valid_error / meta_batch_size)
-        results['val_acc'].append(meta_valid_accuracy / meta_batch_size)
-        results['test_loss'].append(meta_test_error / meta_batch_size)
-        results['test_acc'].append(meta_test_accuracy / meta_batch_size)
+        results['val_acc'].append(meta_valid_accuracy)
+        results['test_acc'].append(meta_test_accuracy)
 
         # Average the accumulated gradients and optimize
         for p in meta_alg.parameters():
@@ -230,7 +204,7 @@ def main(
         opt.step()
 
     if args['save_model']:
-        name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
+        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),args['algorithm'], args['dataset'])
         saveValues(name_file, results, meta_alg.module, args)
 
 if __name__ == '__main__':
@@ -247,15 +221,16 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    device = torch.device("cuda" if use_cuda else "cpu")
+    #device = torch.device("cuda" if use_cuda else "cpu")
+    device = 'cpu'
 
-    model = getModel(args.input_channel, args.ways, device)
+    model = getModel(args.input_channel, device = device)
+    model = loadModel(args.load_model, model, device, args.ways)
+
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,
                     args.linear_reg, args.cost_omega)
-
-    # print(len(list(meta_model.getParams())))
 
     #print(model)
     data_generators = getDataset(args.dataset, args.ways, args.shots)
