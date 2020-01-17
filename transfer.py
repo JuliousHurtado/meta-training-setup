@@ -13,7 +13,8 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder, SVHN, CIFAR10
 
 import learn2learn as l2l
-from learn2learn.data.transforms import NWays, KShots, LoadData, RemapLabels, ConsecutiveLabels
+from learn2learn.data.transforms import KShots, LoadData, RemapLabels, ConsecutiveLabels
+from method.meta_transform import NWays
 
 from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer, create_bookkeeping
 
@@ -80,7 +81,7 @@ def getDataset(name_dataset, ways, shots):
         meta_transforms = [
                     NWays(dataset_train, ways),
                     KShots(dataset_train, 2*shots),
-                    LoadData(dataset_train)
+                    LoadData(dataset_train),
                 ]
 
         generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), 
@@ -181,13 +182,18 @@ def main(
             meta_train_error += evaluation_error.item()
             meta_train_accuracy += evaluation_accuracy.item()
 
+        # Average the accumulated gradients and optimize
+        for p in meta_alg.parameters():
+            p.grad.data.mul_(1.0 / meta_batch_size)
+        opt.step()
+        
         # Compute meta-validation loss
         meta_valid_accuracy = test(meta_alg, data_generators['validation'])
 
         # Compute meta-testing loss
         meta_test_accuracy = test(meta_alg, data_generators['test'])
 
-        if iteration % 500 == 0:
+        if iteration % 1 == 0:
             # Print some metrics
             print('\n')
             print('Iteration', iteration)
@@ -201,11 +207,6 @@ def main(
         results['train_acc'].append(meta_train_accuracy / meta_batch_size)
         results['val_acc'].append(meta_valid_accuracy)
         results['test_acc'].append(meta_test_accuracy)
-
-        # Average the accumulated gradients and optimize
-        for p in meta_alg.parameters():
-            p.grad.data.mul_(1.0 / meta_batch_size)
-        opt.step()
 
     if args['save_model']:
         name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),args['algorithm'], args['dataset'])
