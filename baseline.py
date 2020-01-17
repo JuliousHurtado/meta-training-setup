@@ -205,7 +205,7 @@ def main(
             meta_test_error += evaluation_error.item()
             meta_test_accuracy += evaluation_accuracy.item()
 
-        if iteration % 100 == 0:
+        if iteration % 500 == 0:
             # Print some metrics
             print('\n')
             print('Iteration', iteration)
