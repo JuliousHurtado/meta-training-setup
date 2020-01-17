@@ -15,7 +15,7 @@ from torchvision.datasets import ImageFolder, SVHN, CIFAR10
 import learn2learn as l2l
 from learn2learn.data.transforms import NWays, KShots, LoadData, RemapLabels, ConsecutiveLabels
 
-from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer
+from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer, create_bookkeeping
 
 #from legacy.utils import getRandomDataset
 
@@ -55,6 +55,7 @@ def getDataset(name_dataset, ways, shots):
         ])
     if name_dataset == 'SVHN':
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
+        create_bookkeeping(dataset)
 
         meta_transforms = [
                 l2l.data.transforms.NWays(dataset, ways),
@@ -74,13 +75,16 @@ def getDataset(name_dataset, ways, shots):
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
         dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
+        create_bookkeeping(dataset_train)
+
         meta_transforms = [
                     NWays(dataset_train, ways),
                     KShots(dataset_train, 2*shots),
                     LoadData(dataset_train)
                 ]
 
-        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), task_transforms=meta_transforms)
+        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), 
+                                            task_transforms=meta_transforms, num_tasks=20000)
         generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
         generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=64)
 
@@ -221,9 +225,8 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    #device = torch.device("cuda" if use_cuda else "cpu")
-    device = 'cpu'
-
+    device = torch.device("cuda" if use_cuda else "cpu")
+    
     model = getModel(args.input_channel, device = device)
     model = loadModel(args.load_model, model, device, args.ways)
 

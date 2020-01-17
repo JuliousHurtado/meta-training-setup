@@ -2,6 +2,7 @@
 
 import argparse
 import torch
+from collections import defaultdict
 
 from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 
@@ -98,3 +99,32 @@ def getRegularizer(convFilter, c_theta, linearReg, c_omega):
         regularizator.append(LinearReg(c_omega))
 
     return regularizator
+
+
+def create_bookkeeping(dataset):
+    """
+    Iterates over the entire dataset and creates a map of target to indices.
+    Returns: A dict with key as the label and value as list of indices.
+    """
+
+    assert hasattr(dataset, '__getitem__'), \
+            'Requires iterable-style dataset.'
+
+    labels_to_indices = defaultdict(list)
+    indices_to_labels = defaultdict(int)
+    for i in range(len(dataset)):
+        try:
+            label = dataset[i][1]
+            # if label is a Tensor, then take get the scalar value
+            if hasattr(label, 'item'):
+                label = dataset[i][1].item()
+        except ValueError as e:
+            raise ValueError(
+                'Requires scalar labels. \n' + str(e))
+
+        labels_to_indices[label].append(i)
+        indices_to_labels[i] = label
+
+    dataset.labels_to_indices = labels_to_indices
+    dataset.indices_to_labels = indices_to_labels
+    dataset.labels = list(dataset.labels_to_indices.keys())
