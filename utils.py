@@ -50,7 +50,7 @@ def getArguments():
                         help='random seed (default: 42)')
 
     parser.add_argument('--algorithm', type=str, default='MAML',
-                        help='[MAML, ANIL]')
+                        help='[MAML, ANIL, FT]')
     parser.add_argument('--filter-reg', type=str2bool, default=False,
                         help='Using or not sparse-group regularization in conv filter (default False)')
     parser.add_argument('--cost-theta', type=float, default=0.01,
@@ -87,6 +87,8 @@ def getAlgorithm(algorithm, model, fast_lr, first_order, freeze_layer):
         return MAML(model, lr=fast_lr, first_order=first_order)
     elif algorithm == 'ANIL':
         return MAML(model, lr=fast_lr, first_order=first_order, freeze_layer=freeze_layer) 
+    elif algorithm == 'FT':
+        return model
     else:
         raise Exception('Algorithm {} not supported'.format(algorithm))
 

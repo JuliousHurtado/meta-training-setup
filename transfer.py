@@ -38,6 +38,32 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
+def train_fine_tuning(data_loader, learner, loss, optimizer, regs, device):
+    model.train()
+    running_loss = 0
+    running_corrects = 0
+    for inputs, labels in data_loader:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+
+        out = learner(inputs)
+        _, preds = torch.max(outputs, 1)
+        l = loss(out, labels)
+
+        if len(regs) > 0:
+            for reg in regs:
+                l += reg(learner)
+
+        l.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+        running_corrects += torch.sum(preds == labels.data)
+
+    return running_loss / len(data_loader), running_corrects / len(data_loader)
+
 def test(model, data_loader):
     model.eval()
     correct = 0
@@ -56,15 +82,19 @@ def getDataset(name_dataset, ways, shots):
         ])
     if name_dataset == 'SVHN':
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
-        create_bookkeeping(dataset)
+        
+        if fine_tuning:
+            generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        else:
+            create_bookkeeping(dataset)
 
-        meta_transforms = [
-                l2l.data.transforms.NWays(dataset, ways),
-                l2l.data.transforms.KShots(dataset, 2*shots),
-                l2l.data.transforms.LoadData(dataset),
-            ]
-        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset),
-                                       task_transforms=meta_transforms)
+            meta_transforms = [
+                    l2l.data.transforms.NWays(dataset, ways),
+                    l2l.data.transforms.KShots(dataset, 2*shots),
+                    l2l.data.transforms.LoadData(dataset),
+                ]
+            generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset),
+                                           task_transforms=meta_transforms)
 
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
         generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=64)
@@ -76,16 +106,19 @@ def getDataset(name_dataset, ways, shots):
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
         dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
-        create_bookkeeping(dataset_train)
+        if fine_tuning:
+            generators['train'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
+        else:
+            create_bookkeeping(dataset_train)
 
-        meta_transforms = [
-                    NWays(dataset_train, ways),
-                    KShots(dataset_train, 2*shots),
-                    LoadData(dataset_train),
-                ]
+            meta_transforms = [
+                        NWays(dataset_train, ways),
+                        KShots(dataset_train, 2*shots),
+                        LoadData(dataset_train),
+                    ]
 
-        generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), 
-                                            task_transforms=meta_transforms, num_tasks=20000)
+            generators['train'] = l2l.data.TaskDataset(l2l.data.MetaDataset(dataset_train), 
+                                                task_transforms=meta_transforms, num_tasks=20000)
         generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
         generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=64)
 
@@ -115,7 +148,7 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     valid_error = loss(predictions, evaluation_labels)
 
     if len(regs) > 0:
-         for reg in regs:
+        for reg in regs:
             valid_error += reg(learner)
 
     valid_error /= len(evaluation_data)
@@ -159,33 +192,38 @@ def main(
     }
 
     for iteration in range(num_iterations):
-        opt.zero_grad()
         meta_train_error = 0.0
         meta_train_accuracy = 0.0
         meta_valid_error = 0.0
         meta_valid_accuracy = 0.0
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
-        for task in range(meta_batch_size):
-            # Compute meta-training loss
-            learner = meta_alg.clone()
-            batch = data_generators['train'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            evaluation_error.backward()
+        if fine_tuning:
+            evaluation_error, evaluation_accuracy = train_fine_tuning(data_loader, learner, loss, optimizer, regs, device)
             meta_train_error += evaluation_error.item()
             meta_train_accuracy += evaluation_accuracy.item()
+        else:
+            opt.zero_grad()
+            for task in range(meta_batch_size):
+                # Compute meta-training loss
+                learner = meta_alg.clone()
+                batch = data_generators['train'].sample()
+                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+                                                                   learner,
+                                                                   regs,
+                                                                   loss,
+                                                                   adaptation_steps,
+                                                                   shots,
+                                                                   ways,
+                                                                   device)
+                evaluation_error.backward()
+                meta_train_error += evaluation_error.item()
+                meta_train_accuracy += evaluation_accuracy.item()
 
-        # Average the accumulated gradients and optimize
-        for p in meta_alg.parameters():
-            p.grad.data.mul_(1.0 / meta_batch_size)
-        opt.step()
+            # Average the accumulated gradients and optimize
+            for p in meta_alg.parameters():
+                p.grad.data.mul_(1.0 / meta_batch_size)
+            opt.step()
         
         # Compute meta-validation loss
         meta_valid_accuracy = test(meta_alg, data_generators['validation'])
