@@ -73,7 +73,7 @@ def test(model, data_loader):
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
 
-def getDataset(name_dataset, ways, shots):
+def getDataset(name_dataset, ways, shots, fine_tuning):
     generators = {}
     transform_data = transforms.Compose([
             transforms.Resize(84),
@@ -177,6 +177,7 @@ def main(
         cuda=True,
         seed=42,
         args=None,
+        fine_tuning=False,
 ):
     opt = optim.Adam(meta_alg.parameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
@@ -231,7 +232,7 @@ def main(
         # Compute meta-testing loss
         meta_test_accuracy = test(meta_alg, data_generators['test'])
 
-        if iteration % 1 == 0:
+        if iteration % 500 == 0:
             # Print some metrics
             print('\n')
             print('Iteration', iteration)
@@ -254,6 +255,10 @@ if __name__ == '__main__':
     parser = getArguments()
     args = parser.parse_args()
 
+    fine_tuning = False
+    if args.algorithm == 'FT':
+        fine_tuning = True
+
     use_cuda = torch.cuda.is_available()
 
     random.seed(args.seed)
@@ -275,7 +280,7 @@ if __name__ == '__main__':
                     args.linear_reg, args.cost_omega)
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots)
+    data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
@@ -289,4 +294,5 @@ if __name__ == '__main__':
          adaptation_steps=args.fast_adaption_steps,
          num_iterations=args.iterations,
          seed=args.seed,
-         args=vars(parser.parse_args()))
+         args=vars(parser.parse_args()),
+         fine_tuning=fine_tuning)
