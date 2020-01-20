@@ -49,7 +49,7 @@ def train_fine_tuning(data_loader, learner, loss, optimizer, regs, device):
         optimizer.zero_grad()
 
         out = learner(inputs)
-        _, preds = torch.max(outputs, 1)
+        _, preds = torch.max(out, 1)
         l = loss(out, labels)
 
         if len(regs) > 0:
@@ -59,7 +59,7 @@ def train_fine_tuning(data_loader, learner, loss, optimizer, regs, device):
         l.backward()
         optimizer.step()
 
-        running_loss += loss.item()
+        running_loss += l.item()
         running_corrects += torch.sum(preds == labels.data)
 
     return running_loss / len(data_loader), running_corrects / len(data_loader)
