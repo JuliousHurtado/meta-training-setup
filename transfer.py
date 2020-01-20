@@ -200,7 +200,7 @@ def main(
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
         if fine_tuning:
-            evaluation_error, evaluation_accuracy = train_fine_tuning(data_loader, learner, loss, optimizer, regs, device)
+            evaluation_error, evaluation_accuracy = train_fine_tuning(data_generators['train'], meta_alg, loss, opt, regs, device)
             meta_train_error += evaluation_error.item()
             meta_train_accuracy += evaluation_accuracy.item()
         else:
@@ -232,7 +232,7 @@ def main(
         # Compute meta-testing loss
         meta_test_accuracy = test(meta_alg, data_generators['test'])
 
-        if iteration % 500 == 0:
+        if iteration % 5 == 0:
             # Print some metrics
             print('\n')
             print('Iteration', iteration)
