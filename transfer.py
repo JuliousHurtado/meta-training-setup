@@ -163,6 +163,24 @@ def loadModel(file_name, model, device, ways):
 
     return model
 
+def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size):
+    valid_accuracy = test(model, data_generators['validation'])
+    test_accuracy = test(model, data_generators['test'])
+
+    # Print some metrics
+    print('\n')
+    print('Iteration', iteration)
+    print('Meta Train Error', train_error / batch_size)
+    print('Meta Train Accuracy', train_accuracy / batch_size)
+    print('Meta Valid Accuracy', valid_accuracy)
+    print('Meta Test Accuracy', test_accuracy)
+    print('\n', flush=True)
+
+    results['train_loss'].append(train_error / batch_size)
+    results['train_acc'].append(train_accuracy / batch_size)
+    results['val_acc'].append(valid_accuracy)
+    results['test_acc'].append(test_accuracy)
+
 def main(
         meta_alg,
         data_generators,
@@ -201,8 +219,10 @@ def main(
         meta_test_accuracy = 0.0
         if fine_tuning:
             evaluation_error, evaluation_accuracy = train_fine_tuning(data_generators['train'], meta_alg, loss, opt, regs, device)
-            meta_train_error += evaluation_error.item()
+            meta_train_error += evaluation_error
             meta_train_accuracy += evaluation_accuracy.item()
+
+            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1)
         else:
             opt.zero_grad()
             for task in range(meta_batch_size):
@@ -226,30 +246,15 @@ def main(
                 p.grad.data.mul_(1.0 / meta_batch_size)
             opt.step()
         
-        # Compute meta-validation loss
-        meta_valid_accuracy = test(meta_alg, data_generators['validation'])
-
-        # Compute meta-testing loss
-        meta_test_accuracy = test(meta_alg, data_generators['test'])
-
-        if iteration % 5 == 0:
-            # Print some metrics
-            print('\n')
-            print('Iteration', iteration)
-            print('Meta Train Error', meta_train_error / meta_batch_size)
-            print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
-            print('Meta Valid Accuracy', meta_valid_accuracy)
-            print('Meta Test Accuracy', meta_test_accuracy)
-            print('\n', flush=True)
-
-        results['train_loss'].append(meta_train_error / meta_batch_size)
-        results['train_acc'].append(meta_train_accuracy / meta_batch_size)
-        results['val_acc'].append(meta_valid_accuracy)
-        results['test_acc'].append(meta_test_accuracy)
+            if iteration % int(num_iterations/60):
+                addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, meta_batch_size)
 
     if args['save_model']:
         name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),args['algorithm'], args['dataset'])
-        saveValues(name_file, results, meta_alg.module, args)
+        if fine_tuning:
+            saveValues(name_file, results, meta_alg, args)
+        else:
+            saveValues(name_file, results, meta_alg.module, args)
 
 if __name__ == '__main__':
     parser = getArguments()
