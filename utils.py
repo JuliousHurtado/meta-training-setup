@@ -29,8 +29,8 @@ def getArguments():
     parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
                         help='steps per fast adaption (default: 5)')
 
-    parser.add_argument('--iterations', type=int, default=30000, metavar='N',
-                        help='number of iterations (default: 30000)')
+    parser.add_argument('--iterations', type=int, default=15000, metavar='N',
+                        help='number of iterations (default: 15000)')
 
     parser.add_argument('--dataset', type=str, default='Omniglot', metavar='C',
                         help='[Omniglot, MiniImagenet, cifar10, SVHN]')
@@ -45,6 +45,8 @@ def getArguments():
                         help='Using First order MAML')
     parser.add_argument('--freeze-layer', nargs='+', type=int, metavar='LR',
                         help='List of frozen layers')
+    parser.add_argument('--only-linear', type=str2bool, default=False,
+                        help='train only classifier (default False)')
 
     parser.add_argument('--seed', type=int, default=42, metavar='S',
                         help='random seed (default: 42)')

@@ -24,7 +24,7 @@ import traceback
 import warnings
 import sys
 
-base_path = 'results/models'
+base_path = 'results'
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
 
@@ -196,8 +196,12 @@ def main(
         seed=42,
         args=None,
         fine_tuning=False,
+        only_linear=False
 ):
-    opt = optim.Adam(meta_alg.parameters(), lr)
+    if only_linear:
+        opt = optim.Adam(meta_alg.linear.parameters(), lr)
+    else:
+        opt = optim.Adam(meta_alg.parameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
@@ -246,7 +250,7 @@ def main(
                 p.grad.data.mul_(1.0 / meta_batch_size)
             opt.step()
         
-            if iteration % int(num_iterations/60):
+            if iteration % int(num_iterations/60) == 0:
                 addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, meta_batch_size)
 
     if args['save_model']:
@@ -300,4 +304,5 @@ if __name__ == '__main__':
          num_iterations=args.iterations,
          seed=args.seed,
          args=vars(parser.parse_args()),
-         fine_tuning=fine_tuning)
+         fine_tuning=fine_tuning,
+         only_linear=args.only_linear)
