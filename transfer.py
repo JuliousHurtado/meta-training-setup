@@ -181,6 +181,17 @@ def addResults(model, data_generators, results, iteration, train_error, train_ac
     results['val_acc'].append(valid_accuracy)
     results['test_acc'].append(test_accuracy)
 
+def getParamsTrained(model, freeze_layer):
+    if len(freeze_layer) == 0:
+        return model.parameters()
+    else:
+        params = []
+        for name, param in model.named_parameters():
+            if name[5] == 'r' or int(name[5]) not in freeze_layer:
+                params.append(param)
+
+        return params
+
 def main(
         meta_alg,
         data_generators,
@@ -196,12 +207,9 @@ def main(
         seed=42,
         args=None,
         fine_tuning=False,
-        only_linear=False
+        freeze_layer=[]
 ):
-    if only_linear:
-        opt = optim.Adam(meta_alg.linear.parameters(), lr)
-    else:
-        opt = optim.Adam(meta_alg.parameters(), lr)
+    opt = optim.Adam(getParamsTrained(meta_alg, freeze_layer), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
@@ -305,4 +313,4 @@ if __name__ == '__main__':
          seed=args.seed,
          args=vars(parser.parse_args()),
          fine_tuning=fine_tuning,
-         only_linear=args.only_linear)
+         freeze_layer=args.freeze_layer)
