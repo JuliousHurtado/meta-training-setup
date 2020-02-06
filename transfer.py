@@ -182,7 +182,7 @@ def addResults(model, data_generators, results, iteration, train_error, train_ac
     results['test_acc'].append(test_accuracy)
 
 def getParamsTrained(model, freeze_layer):
-    if len(freeze_layer) == 0:
+    if freeze_layer is None or len(freeze_layer) == 0:
         return model.parameters()
     else:
         params = []
