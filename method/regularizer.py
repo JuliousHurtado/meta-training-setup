@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 class FilterSparseReg(nn.Module):
     def __init__(self, c_theta = 0, i_beta = 0.1, f_beta = 1, num_layer = 4):
-        super(FilterReg, self).__init__()
+        super(FilterSparseReg, self).__init__()
         self.beta = np.linspace(i_beta, f_beta, num = num_layer)
         self.c_theta = c_theta
 

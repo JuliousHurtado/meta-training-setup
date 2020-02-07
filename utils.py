@@ -136,3 +136,67 @@ def create_bookkeeping(dataset):
     dataset.labels_to_indices = labels_to_indices
     dataset.indices_to_labels = indices_to_labels
     dataset.labels = list(dataset.labels_to_indices.keys())
+
+
+def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device):
+    data, labels = batch
+    data, labels = data.to(device), labels.to(device)
+
+    # Separate data into adaptation/evalutation sets
+    adaptation_indices = torch.zeros(data.size(0), dtype=torch.bool)#.byte()
+    adaptation_indices[torch.arange(shots*ways) * 2] = 1
+    adaptation_data, adaptation_labels = data[adaptation_indices], labels[adaptation_indices]
+    evaluation_data, evaluation_labels = data[~adaptation_indices], labels[~adaptation_indices]
+
+    # Adapt the model
+    for step in range(adaptation_steps):
+        train_error = loss(learner(adaptation_data), adaptation_labels)
+        train_error /= len(adaptation_data)
+        learner.adapt(train_error)
+
+    # Evaluate the adapted model
+    predictions = learner(evaluation_data)
+    valid_error = loss(predictions, evaluation_labels)
+
+    if len(regs) > 0:
+        for reg in regs:
+            valid_error += reg(learner)
+
+    valid_error /= len(evaluation_data)
+    valid_accuracy = accuracy(predictions, evaluation_labels)
+    return valid_error, valid_accuracy
+
+def train_normal(data_loader, learner, loss, optimizer, regs, device):
+    model.train()
+    running_loss = 0
+    running_corrects = 0
+    for inputs, labels in data_loader:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+
+        out = learner(inputs)
+        _, preds = torch.max(out, 1)
+        l = loss(out, labels)
+
+        if len(regs) > 0:
+            for reg in regs:
+                l += reg(learner)
+
+        l.backward()
+        optimizer.step()
+
+        running_loss += l.item()
+        running_corrects += torch.sum(preds == labels.data)
+
+    return running_loss / len(data_loader), running_corrects / len(data_loader)
+
+def test_normal(model, data_loader):
+    model.eval()
+    correct = 0
+    for input, target in data_loader:
+        input, target = input.to(device), target.to(device)
+        output = model(input)
+        correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
+    return correct.item() / len(data_loader.dataset)

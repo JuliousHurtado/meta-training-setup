@@ -18,7 +18,8 @@ from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 from method.maml import MAML
 from method.regularizer import FilterReg, LinearReg
 
-from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer
+from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer,
+                    test_normal, fast_adapt, train_normal
 
 #from legacy.utils import getRandomDataset
 
@@ -88,40 +89,33 @@ def getDataset(name_dataset, ways, shots):
             generators[mode] = l2l.data.TaskDataset(dataset,
                                        task_transforms=transforms,
                                        num_tasks=num_tasks)
+    elif name_dataset == 'Tiny-FT':
+        for mode in ['train','validation','test']:
+            dataset = l2l.vision.datasets.MiniImagenet(root='./data', mode=mode)    
+            generators[mode] = torch.utils.data.DataLoader(dataset, batch_size=64)
 
     else:
         raise Exception('Dataset {} not supported'.format(dataset))
 
     return generators
 
-def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device):
-    data, labels = batch
-    data, labels = data.to(device), labels.to(device)
+def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size):
+    valid_accuracy = test_normal(model, data_generators['validation'])
+    test_accuracy = test_normal(model, data_generators['test'])
 
-    # Separate data into adaptation/evalutation sets
-    adaptation_indices = torch.zeros(data.size(0), dtype=torch.bool)#.byte()
-    adaptation_indices[torch.arange(shots*ways) * 2] = 1
-    adaptation_data, adaptation_labels = data[adaptation_indices], labels[adaptation_indices]
-    evaluation_data, evaluation_labels = data[~adaptation_indices], labels[~adaptation_indices]
+    # Print some metrics
+    print('\n')
+    print('Iteration', iteration)
+    print('Meta Train Error', train_error / batch_size)
+    print('Meta Train Accuracy', train_accuracy / batch_size)
+    print('Meta Valid Accuracy', valid_accuracy)
+    print('Meta Test Accuracy', test_accuracy)
+    print('\n', flush=True)
 
-    # Adapt the model
-    for step in range(adaptation_steps):
-        train_error = loss(learner(adaptation_data), adaptation_labels)
-        train_error /= len(adaptation_data)
-        learner.adapt(train_error)
-
-    # Evaluate the adapted model
-    predictions = learner(evaluation_data)
-    valid_error = loss(predictions, evaluation_labels)
-
-    if len(regs) > 0:
-         for reg in regs:
-            valid_error += reg(learner)
-
-    valid_error /= len(evaluation_data)
-    valid_accuracy = accuracy(predictions, evaluation_labels)
-    return valid_error, valid_accuracy
-
+    results['train_loss'].append(train_error / batch_size)
+    results['train_acc'].append(train_accuracy / batch_size)
+    results['val_acc'].append(valid_accuracy)
+    results['test_acc'].append(test_accuracy)
 
 def main(
         meta_alg,
@@ -152,82 +146,89 @@ def main(
     }
 
     for iteration in range(num_iterations):
-        opt.zero_grad()
         meta_train_error = 0.0
         meta_train_accuracy = 0.0
         meta_valid_error = 0.0
         meta_valid_accuracy = 0.0
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
-        for task in range(meta_batch_size):
-            # Compute meta-training loss
-            learner = meta_alg.clone()
-            batch = data_generators['train'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            #meta_alg.printValue()
-            #learner.printValue()
-            evaluation_error.backward()
-            meta_train_error += evaluation_error.item()
-            meta_train_accuracy += evaluation_accuracy.item()
+        if fine_tuning:
+            evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device)
+            meta_train_error = evaluation_error
+            meta_train_accuracy = evaluation_accuracy.item()
 
-            # Compute meta-validation loss
-            learner = meta_alg.clone()
-            batch = data_generators['validation'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            meta_valid_error += evaluation_error.item()
-            meta_valid_accuracy += evaluation_accuracy.item()
+            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1)
+        else:
+            opt.zero_grad()
+            for task in range(meta_batch_size):
+                # Compute meta-training loss
+                learner = meta_alg.clone()
+                batch = data_generators['train'].sample()
+                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+                                                                   learner,
+                                                                   regs,
+                                                                   loss,
+                                                                   adaptation_steps,
+                                                                   shots,
+                                                                   ways,
+                                                                   device)
+                #meta_alg.printValue()
+                #learner.printValue()
+                evaluation_error.backward()
+                meta_train_error += evaluation_error.item()
+                meta_train_accuracy += evaluation_accuracy.item()
 
-            # Compute meta-testing loss
-            learner = meta_alg.clone()
-            batch = data_generators['test'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                               learner,
-                                                               regs,
-                                                               loss,
-                                                               adaptation_steps,
-                                                               shots,
-                                                               ways,
-                                                               device)
-            meta_test_error += evaluation_error.item()
-            meta_test_accuracy += evaluation_accuracy.item()
+                # Compute meta-validation loss
+                learner = meta_alg.clone()
+                batch = data_generators['validation'].sample()
+                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+                                                                   learner,
+                                                                   regs,
+                                                                   loss,
+                                                                   adaptation_steps,
+                                                                   shots,
+                                                                   ways,
+                                                                   device)
+                meta_valid_error += evaluation_error.item()
+                meta_valid_accuracy += evaluation_accuracy.item()
 
-        if iteration % 500 == 0:
-            # Print some metrics
-            print('\n')
-            print('Iteration', iteration)
-            print('Meta Train Error', meta_train_error / meta_batch_size)
-            print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
-            print('Meta Valid Error', meta_valid_error / meta_batch_size)
-            print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
-            print('Meta Test Error', meta_test_error / meta_batch_size)
-            print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
-            print('\n', flush=True)
+                # Compute meta-testing loss
+                learner = meta_alg.clone()
+                batch = data_generators['test'].sample()
+                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+                                                                   learner,
+                                                                   regs,
+                                                                   loss,
+                                                                   adaptation_steps,
+                                                                   shots,
+                                                                   ways,
+                                                                   device)
+                meta_test_error += evaluation_error.item()
+                meta_test_accuracy += evaluation_accuracy.item()
 
-        results['train_loss'].append(meta_train_error / meta_batch_size)
-        results['train_acc'].append(meta_train_accuracy / meta_batch_size)
-        results['val_loss'].append(meta_valid_error / meta_batch_size)
-        results['val_acc'].append(meta_valid_accuracy / meta_batch_size)
-        results['test_loss'].append(meta_test_error / meta_batch_size)
-        results['test_acc'].append(meta_test_accuracy / meta_batch_size)
+            if iteration % 500 == 0:
+                # Print some metrics
+                print('\n')
+                print('Iteration', iteration)
+                print('Meta Train Error', meta_train_error / meta_batch_size)
+                print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
+                print('Meta Valid Error', meta_valid_error / meta_batch_size)
+                print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
+                print('Meta Test Error', meta_test_error / meta_batch_size)
+                print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
+                print('\n', flush=True)
 
-        # Average the accumulated gradients and optimize
-        for p in meta_alg.parameters():
-            p.grad.data.mul_(1.0 / meta_batch_size)
-        opt.step()
+            results['train_loss'].append(meta_train_error / meta_batch_size)
+            results['train_acc'].append(meta_train_accuracy / meta_batch_size)
+            results['val_loss'].append(meta_valid_error / meta_batch_size)
+            results['val_acc'].append(meta_valid_accuracy / meta_batch_size)
+            results['test_loss'].append(meta_test_error / meta_batch_size)
+            results['test_acc'].append(meta_test_accuracy / meta_batch_size)
+
+            # Average the accumulated gradients and optimize
+            for p in meta_alg.parameters():
+                p.grad.data.mul_(1.0 / meta_batch_size)
+            opt.step()
 
     if args['save_model']:
         name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
@@ -253,7 +254,8 @@ if __name__ == '__main__':
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,
-                    args.linear_reg, args.cost_omega)
+                    args.linear_reg, args.cost_omega,
+                    args.sparse_reg)
 
     # print(len(list(meta_model.getParams())))
 
