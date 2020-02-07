@@ -92,16 +92,16 @@ def getDataset(name_dataset, ways, shots):
     elif name_dataset == 'Tiny-FT':
         for mode in ['train','validation','test']:
             dataset = l2l.vision.datasets.MiniImagenet(root='./data', mode=mode)    
-            generators[mode] = torch.utils.data.DataLoader(dataset, batch_size=64)
+            generators[mode] = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
 
     else:
         raise Exception('Dataset {} not supported'.format(dataset))
 
     return generators
 
-def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size):
-    valid_accuracy = test_normal(model, data_generators['validation'])
-    test_accuracy = test_normal(model, data_generators['test'])
+def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size, device):
+    valid_accuracy = test_normal(model, data_generators['validation'], device)
+    test_accuracy = test_normal(model, data_generators['test'], device)
 
     # Print some metrics
     print('\n')
@@ -159,7 +159,7 @@ def main(
             meta_train_error = evaluation_error
             meta_train_accuracy = evaluation_accuracy.item()
 
-            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1)
+            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1, device)
         else:
             opt.zero_grad()
             for task in range(meta_batch_size):
@@ -281,4 +281,4 @@ if __name__ == '__main__':
          num_iterations=args.iterations,
          seed=args.seed,
          args=vars(parser.parse_args()),
-         fine_tuning)
+         fine_tuning=fine_tuning)

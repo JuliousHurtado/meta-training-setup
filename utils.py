@@ -167,12 +167,12 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     return valid_error, valid_accuracy
 
 def train_normal(data_loader, learner, loss, optimizer, regs, device):
-    model.train()
+    learner.train()
     running_loss = 0
     running_corrects = 0
     for inputs, labels in data_loader:
         inputs = inputs.to(device)
-        labels = labels.to(device)
+        labels = labels.long().to(device)
 
         optimizer.zero_grad()
 
@@ -192,7 +192,7 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device):
 
     return running_loss / len(data_loader), running_corrects / len(data_loader)
 
-def test_normal(model, data_loader):
+def test_normal(model, data_loader, device):
     model.eval()
     correct = 0
     for input, target in data_loader:
