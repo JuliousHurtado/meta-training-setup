@@ -18,7 +18,7 @@ from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 from method.maml import MAML
 from method.regularizer import FilterReg, LinearReg
 
-from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer,
+from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer, \
                     test_normal, fast_adapt, train_normal
 
 #from legacy.utils import getRandomDataset
@@ -131,6 +131,8 @@ def main(
         cuda=True,
         seed=42,
         args=None,
+        fine_tuning=False,
+
 ):
     opt = optim.Adam(meta_alg.parameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
@@ -238,6 +240,10 @@ if __name__ == '__main__':
     parser = getArguments()
     args = parser.parse_args()
 
+    fine_tuning = False
+    if args.algorithm == 'FT':
+        fine_tuning = True
+
     use_cuda = torch.cuda.is_available()
 
     random.seed(args.seed)
@@ -274,4 +280,5 @@ if __name__ == '__main__':
          adaptation_steps=args.fast_adaption_steps,
          num_iterations=args.iterations,
          seed=args.seed,
-         args=vars(parser.parse_args()))
+         args=vars(parser.parse_args()),
+         fine_tuning)
