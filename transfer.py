@@ -294,7 +294,8 @@ if __name__ == '__main__':
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,
-                    args.linear_reg, args.cost_omega)
+                    args.linear_reg, args.cost_omega,
+                    args.sparse_reg)
 
     #print(model)
     data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning)

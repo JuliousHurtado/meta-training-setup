@@ -67,6 +67,6 @@ class LinearReg(nn.Module):
 
         for i in range(weight.size(0)):
             for j in range(32):
-                loss_reg += weight[i][(25*25)*j:(25*25)*(j+1)].norm(2)
+                loss_reg += weight[i][(5*5)*j:(5*5)*(j+1)].norm(2)
 
         return loss_reg*self.c_omega

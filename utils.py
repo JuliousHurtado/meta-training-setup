@@ -7,7 +7,7 @@ from collections import defaultdict
 from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 
 from method.maml import MAML
-from method.regularizer import FilterReg, LinearReg
+from method.regularizer import FilterReg, LinearReg, FilterSparseReg
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
@@ -61,6 +61,8 @@ def getArguments():
                         help='Using or not sparse-group regularization in linear layer (default False)')
     parser.add_argument('--cost-omega', type=float, default=0.01,
                         help='cost value of linear reg (default 0.01)')
+    parser.add_argument('--sparse-reg', type=str2bool, default=False,
+                        help='Using or not sparse-group regularization in conv filter (default False)')
 
     parser.add_argument('--save-model', type=str2bool, default=True, metavar='LR',
                         help='save model (default True)')
@@ -94,13 +96,15 @@ def getAlgorithm(algorithm, model, fast_lr, first_order, freeze_layer):
     else:
         raise Exception('Algorithm {} not supported'.format(algorithm))
 
-def getRegularizer(convFilter, c_theta, linearReg, c_omega):
+def getRegularizer(convFilter, c_theta, linearReg, c_omega, sparseFilter):
     regularizator = []
 
     if convFilter:
         regularizator.append(FilterReg(c_theta))
     if linearReg:
         regularizator.append(LinearReg(c_omega))
+    if sparseFilter:
+        regularizator.append(FilterSparseReg(c_theta))
 
     return regularizator
 
