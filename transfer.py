@@ -16,7 +16,9 @@ import learn2learn as l2l
 from learn2learn.data.transforms import KShots, LoadData, RemapLabels, ConsecutiveLabels
 from method.meta_transform import NWays
 
-from utils import saveValues, getArguments, getModel, getAlgorithm, getRegularizer, create_bookkeeping
+from utils import saveValues, getArguments, getModel, 
+                    getAlgorithm, getRegularizer, create_bookkeeping,
+                    fast_adapt, train_normal, test_normal
 
 #from legacy.utils import getRandomDataset
 
@@ -37,41 +39,6 @@ warnings.showwarning = warn_with_traceback
 def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
-
-def train_fine_tuning(data_loader, learner, loss, optimizer, regs, device):
-    model.train()
-    running_loss = 0
-    running_corrects = 0
-    for inputs, labels in data_loader:
-        inputs = inputs.to(device)
-        labels = labels.to(device)
-
-        optimizer.zero_grad()
-
-        out = learner(inputs)
-        _, preds = torch.max(out, 1)
-        l = loss(out, labels)
-
-        if len(regs) > 0:
-            for reg in regs:
-                l += reg(learner)
-
-        l.backward()
-        optimizer.step()
-
-        running_loss += l.item()
-        running_corrects += torch.sum(preds == labels.data)
-
-    return running_loss / len(data_loader), running_corrects / len(data_loader)
-
-def test(model, data_loader):
-    model.eval()
-    correct = 0
-    for input, target in data_loader:
-        input, target = input.to(device), target.to(device)
-        output = model(input)
-        correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
-    return correct.item() / len(data_loader.dataset)
 
 def getDataset(name_dataset, ways, shots, fine_tuning):
     generators = {}
@@ -127,34 +94,6 @@ def getDataset(name_dataset, ways, shots, fine_tuning):
 
     return generators
 
-def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device):
-    data, labels = batch
-    data, labels = data.to(device), labels.to(device)
-
-    # Separate data into adaptation/evalutation sets
-    adaptation_indices = torch.zeros(data.size(0), dtype=torch.bool)#.byte()
-    adaptation_indices[torch.arange(shots*ways) * 2] = 1
-    adaptation_data, adaptation_labels = data[adaptation_indices], labels[adaptation_indices]
-    evaluation_data, evaluation_labels = data[~adaptation_indices], labels[~adaptation_indices]
-
-    # Adapt the model
-    for step in range(adaptation_steps):
-        train_error = loss(learner(adaptation_data), adaptation_labels)
-        train_error /= len(adaptation_data)
-        learner.adapt(train_error)
-
-    # Evaluate the adapted model
-    predictions = learner(evaluation_data)
-    valid_error = loss(predictions, evaluation_labels)
-
-    if len(regs) > 0:
-        for reg in regs:
-            valid_error += reg(learner)
-
-    valid_error /= len(evaluation_data)
-    valid_accuracy = accuracy(predictions, evaluation_labels)
-    return valid_error, valid_accuracy
-
 def loadModel(file_name, model, device, ways):
     checkpoint = torch.load(os.path.join(base_path,file_name), map_location=device)
 
@@ -163,9 +102,9 @@ def loadModel(file_name, model, device, ways):
 
     return model
 
-def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size):
-    valid_accuracy = test(model, data_generators['validation'])
-    test_accuracy = test(model, data_generators['test'])
+def addResults(model, data_generators, results, iteration, train_error, train_accuracy, batch_size, device):
+    valid_accuracy = test_normal(model, data_generators['validation'], device)
+    test_accuracy = test_normal(model, data_generators['test'], device)
 
     # Print some metrics
     print('\n')
@@ -230,11 +169,11 @@ def main(
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
         if fine_tuning:
-            evaluation_error, evaluation_accuracy = train_fine_tuning(data_generators['train'], meta_alg, loss, opt, regs, device)
-            meta_train_error += evaluation_error
-            meta_train_accuracy += evaluation_accuracy.item()
+            evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device)
+            meta_train_error = evaluation_error
+            meta_train_accuracy = evaluation_accuracy.item()
 
-            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1)
+            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1, device)
         else:
             opt.zero_grad()
             for task in range(meta_batch_size):
