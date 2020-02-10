@@ -4,6 +4,7 @@ import argparse
 import torch
 from collections import defaultdict
 
+from torch.nn import functional as F
 from learn2learn.vision.models import OmniglotCNN, MiniImagenetCNN
 
 from method.maml import MAML
@@ -137,6 +138,9 @@ def create_bookkeeping(dataset):
     dataset.indices_to_labels = indices_to_labels
     dataset.labels = list(dataset.labels_to_indices.keys())
 
+def accuracy(predictions, targets):
+    predictions = predictions.argmax(dim=1).view(targets.shape)
+    return (predictions == targets).sum().float() / targets.size(0)
 
 def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device):
     data, labels = batch
@@ -196,7 +200,7 @@ def test_normal(model, data_loader, device):
     model.eval()
     correct = 0
     for input, target in data_loader:
-        input, target = input.to(device), target.to(device)
+        input, target = input.to(device), target.long().to(device)
         output = model(input)
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
