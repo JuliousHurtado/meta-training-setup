@@ -69,6 +69,8 @@ def getArguments():
                         help='save model (default True)')
     parser.add_argument('--load-model', type=str, default='', metavar='LR',
                         help='Model to Load, ./results/models/name_file')
+    parser.add_argument('--init-ways', type=int, default=200, metavar='N',
+                        help='number of ways (default: 5)')
 
     return parser
 

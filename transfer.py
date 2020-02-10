@@ -16,8 +16,8 @@ import learn2learn as l2l
 from learn2learn.data.transforms import KShots, LoadData, RemapLabels, ConsecutiveLabels
 from method.meta_transform import NWays
 
-from utils import saveValues, getArguments, getModel, 
-                    getAlgorithm, getRegularizer, create_bookkeeping,
+from utils import saveValues, getArguments, getModel, \
+                    getAlgorithm, getRegularizer, create_bookkeeping, \
                     fast_adapt, train_normal, test_normal
 
 #from legacy.utils import getRandomDataset
@@ -227,7 +227,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = getModel(args.input_channel, device = device)
+    model = getModel(args.input_channel, ways=args.init_ways, device=device)
     model = loadModel(args.load_model, model, device, args.ways)
 
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
