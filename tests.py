@@ -37,6 +37,20 @@ def getDataset(name_dataset, ways, shots):
                                        task_transforms=transforms,
                                        num_tasks=num_tasks)
 
+    elif name_dataset == 'SVHN':
+        transform_data = transforms.Compose([
+            transforms.Resize(84),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+        dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
+        
+        generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+
+        dataset = SVHN('./data/', split='test', transform=transform_data, download=True)
+        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+
     elif name_dataset == 'cifar10':
         transform_data = transforms.Compose([
             transforms.Resize(84),
