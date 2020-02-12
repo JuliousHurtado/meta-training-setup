@@ -26,13 +26,12 @@ def getModel(input_channels, ways = 5, device = 'cpu'):
         raise Exception('Input Channels must be 1 or 3, not: {}'.format(input_channels))
 
 def test_normal(model, data_loader, device):
-    model.eval()
+    #model.eval()
     correct = 0
     for input, target in data_loader:
         input, target = input.to(device), target.long().to(device)
-        output = model[0](input)
-        output = model[1](input)
-        break
+        o = model[0](input)
+        output = model[1](o)
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
 

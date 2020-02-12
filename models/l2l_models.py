@@ -228,6 +228,9 @@ class MiniImagenetCNN(nn.Module):
 
     def forward(self, x):
         x = self.base(x)
-        print(x.sum())
-        x = self.linear2(x.view(-1, 25 * self.hidden_size))
+        #x = self.linear(x.view(-1, 25 * self.hidden_size))
+        return x.view(-1, 25 * self.hidden_size)
+
+    def forwardHead(self, x):
+        x = self.linear(x)
         return x
