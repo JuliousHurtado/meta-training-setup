@@ -8,6 +8,7 @@ A set of commonly used models for meta-learning vision tasks.
 import torch
 from scipy.stats import truncnorm
 from torch import nn
+from torch.nn import functional as F
 
 
 def truncated_normal_(tensor, mean=0.0, std=1.0):
@@ -225,8 +226,8 @@ class MiniImagenetCNN(nn.Module):
         #maml_init_(self.linear)
         self.hidden_size = hidden_size
 
-    def forward(self, x, w, b):
+    def forward(self, x):
         x = self.base(x)
-        x = F.linear(input, w, b)
-        #x = self.linear2(x.view(-1, 25 * self.hidden_size))
+        print(x.sum())
+        x = self.linear2(x.view(-1, 25 * self.hidden_size))
         return x
