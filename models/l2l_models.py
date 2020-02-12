@@ -78,7 +78,7 @@ class ConvBlock(nn.Module):
                                         # momentum=0.999,
                                         # track_running_stats=False,
                                         )
-        nn.init.uniform_(self.normalize.weight)
+        #nn.init.uniform_(self.normalize.weight)
         self.relu = nn.ReLU()
 
         self.conv = nn.Conv2d(in_channels,
@@ -87,7 +87,7 @@ class ConvBlock(nn.Module):
                               stride=stride,
                               padding=1,
                               bias=True)
-        maml_init_(self.conv)
+        #maml_init_(self.conv)
 
     def forward(self, x):
         x = self.conv(x)
@@ -222,7 +222,7 @@ class MiniImagenetCNN(nn.Module):
                              layers=layers,
                              max_pool_factor=4 // layers)
         self.linear = nn.Linear(25 * hidden_size, output_size, bias=True)
-        maml_init_(self.linear)
+        #maml_init_(self.linear)
         self.hidden_size = hidden_size
 
     def forward(self, x):

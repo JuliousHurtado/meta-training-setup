@@ -74,7 +74,10 @@ def getDataset(name_dataset, ways, shots):
 
     return generators
 
-def loadModel(file_name, model, file_head, model_head, device):
+def loadModel(args, file_name, model, file_head, model_head, device):
+    model = getModel(args.input_channel, ways=args.init_ways, device=device)
+    model_head = getModel(args.input_channel, ways=args.ways, device=device)
+
     checkpoint = torch.load(os.path.join(base_path,file_name), map_location=device)
     model.load_state_dict(checkpoint['checkpoint'])
 
@@ -133,10 +136,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    model = getModel(args.input_channel, ways=args.init_ways, device=device)
-    model_head = getModel(args.input_channel, ways=args.ways, device=device)
-    model = loadModel(args.load_model, model, args.load_head, model_head, device)
-
+    model = loadModel(args, args.load_model, model, args.load_head, model_head, device)
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     
     data_generators = getDataset(args.dataset, args.ways, args.shots)
