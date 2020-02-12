@@ -225,7 +225,8 @@ class MiniImagenetCNN(nn.Module):
         #maml_init_(self.linear)
         self.hidden_size = hidden_size
 
-    def forward(self, x):
+    def forward(self, x, w, b):
         x = self.base(x)
-        x = self.linear2(x.view(-1, 25 * self.hidden_size))
+        x = F.linear(input, w, b)
+        #x = self.linear2(x.view(-1, 25 * self.hidden_size))
         return x
