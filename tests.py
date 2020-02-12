@@ -6,16 +6,31 @@ import copy
 import numpy as np
 import torch
 from torch import nn
-from torchvision import transforms
+import torchvision
+from torchvision.datasets import ImageFolder, SVHN, CIFAR10
+from models.l2l_models import MiniImagenetCNN, OmniglotCNN
 
 import learn2learn as l2l
 
-from utils import getArguments, getModel, getAlgorithm, fast_adapt, test_normal
+from utils import getArguments, getAlgorithm, fast_adapt, test_normal
 
 base_path = 'results'
 
+def getModel(input_channels, ways = 5, device = 'cpu'):
+    if input_channels == 1:
+        return OmniglotCNN(ways).to(device)
+    elif input_channels == 3:
+        return MiniImagenetCNN(ways).to(device)
+    else:
+        raise Exception('Input Channels must be 1 or 3, not: {}'.format(input_channels))
+
 def getDataset(name_dataset, ways, shots):
     generators = {}
+    transform_data = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(84),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
 
     if name_dataset == 'MiniImagenet':
         train_dataset = None
@@ -38,11 +53,6 @@ def getDataset(name_dataset, ways, shots):
                                        num_tasks=num_tasks)
 
     elif name_dataset == 'SVHN':
-        transform_data = transforms.Compose([
-            transforms.Resize(84),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
         
         generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=64)
@@ -52,12 +62,6 @@ def getDataset(name_dataset, ways, shots):
         generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=64)
 
     elif name_dataset == 'cifar10':
-        transform_data = transforms.Compose([
-            transforms.Resize(84),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
         dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
@@ -77,17 +81,21 @@ def loadModel(file_name, model, file_head, model_head, device):
     checkpoint = torch.load(os.path.join(base_path,file_head), map_location=device)
     model_head.load_state_dict(checkpoint['checkpoint'])
 
-    model.linear = copy.deepcopy(model_head.linear)
+    print("Model:")
+    for (name1, param1), (name2, param2) in zip(model.named_parameters(), model_head.named_parameters()):
+        print(name1, ': ', (param1 - param2).sum())
+
+    model.linear2 = copy.deepcopy(model_head.linear)
 
     return model
 
 def main(model, data_generators, ways, shots, device, adaptation_steps, args, fine_tuning):
     loss = nn.CrossEntropyLoss(reduction='mean')
 
+    tests = []
     if fine_tuning:
-        test_accuracy = test_normal(model, data_generators['test'], device)
+        tests.append(test_normal(model, data_generators['test'], device))
     else:
-        tests = []
         for iteration in range(100):
             learner = model.clone()
             batch = data_generators['test'].sample()
@@ -99,6 +107,7 @@ def main(model, data_generators, ways, shots, device, adaptation_steps, args, fi
                                                                    shots,
                                                                    ways,
                                                                    device)
+            tests.append(evaluation_accuracy)
 
     print(args)
     print(np.mean(tests))
