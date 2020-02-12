@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import random
 import os
 import copy
 
@@ -81,23 +81,6 @@ def loadModel(file_name, model, file_head, model_head, device):
 
     return model
 
-def getModel(input_channels, ways = 5, device = 'cpu'):
-    if input_channels == 1:
-        return OmniglotCNN(ways).to(device)
-    elif input_channels == 3:
-        return MiniImagenetCNN(ways).to(device)
-    else:
-        raise Exception('Input Channels must be 1 or 3, not: {}'.format(input_channels))
-
-def test_normal(model, data_loader, device):
-    model.eval()
-    correct = 0
-    for input, target in data_loader:
-        input, target = input.to(device), target.long().to(device)
-        output = model(input)
-        correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
-    return correct.item() / len(data_loader.dataset)
-
 def main(model, data_generators, ways, shots, device, adaptation_steps, args, fine_tuning):
     loss = nn.CrossEntropyLoss(reduction='mean')
 
@@ -111,7 +94,7 @@ def main(model, data_generators, ways, shots, device, adaptation_steps, args, fi
             evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                    learner,
                                                                    [],
-                                                                   loss
+                                                                   loss,
                                                                    adaptation_steps,
                                                                    shots,
                                                                    ways,
