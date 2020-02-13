@@ -248,7 +248,7 @@ if __name__ == '__main__':
                     args.sparse_reg)
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning, args.ewc)
+    data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning, args.use_ewc)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
