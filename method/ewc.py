@@ -19,7 +19,15 @@ class EWC(object):
         if self.freeze_layer is None:
             self.freeze_layer = []
 
-        self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad and (int(n[5]) not in self.freeze_layer) }
+        #self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad and (int(n[5]) not in self.freeze_layer) }
+        self.params = {}
+
+        for n, p in self.model.named_parameters():
+            if n[5] == 'r':
+                continue
+            if p.requires_grad and (int(n[5]) not in self.freeze_layer):
+                self.params[n] = p            
+
         self._means = {}
         self._precision_matrices = self._diag_fisher()
 
@@ -42,6 +50,8 @@ class EWC(object):
             loss.backward()
 
             for n, p in self.model.named_parameters():
+                if n[5] == 'r':
+                    continue
                 if int(n[5]) not in self.freeze_layer:
                     precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
 
@@ -51,6 +61,8 @@ class EWC(object):
     def penalty(self, model: nn.Module):
         loss = 0
         for n, p in model.named_parameters():
+            if n[5] == 'r':
+                continue
             if int(n[5]) not in self.freeze_layer:
                 _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
                 loss += _loss.sum()
