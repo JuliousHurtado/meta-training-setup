@@ -5,6 +5,7 @@ import random
 import time
 
 import numpy as np
+from PIL import Image
 import torch
 from torch import nn
 from torch import optim
@@ -44,7 +45,7 @@ def accuracy(predictions, targets):
 def get_sample(dataset, sample_size):
     sample_idx = random.sample(range(len(dataset)), sample_size)
     temp = []
-    for img in dataset.digit_data[sample_idx]:
+    for img in dataset.data[sample_idx]:
         if dataset.transform:
             img = dataset.transform(Image.fromarray(img)).unsqueeze(0)
         temp.append(img)
@@ -185,7 +186,7 @@ def main(
         if fine_tuning:
             ewc = None
             if args['use_ewc']:
-                ewc = EWC(model, data_generators['sample'], args['importance'], freeze_layer)
+                ewc = EWC(model, data_generators['sample'], args['ewc_importance'], freeze_layer)
             
             evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device, ewc)
             meta_train_error = evaluation_error

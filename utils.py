@@ -50,6 +50,8 @@ def getArguments():
                         help='train only classifier (default False)')
     parser.add_argument('--use-ewc', type=str2bool, default=False,
                         help='Use EWC')
+    parser.add_argument('--ewc-importance', type=float, default=100, metavar='LR',
+                        help='learning rate for MAML (default: 0.5)')
 
     parser.add_argument('--seed', type=int, default=42, metavar='S',
                         help='random seed (default: 42)')
