@@ -16,6 +16,9 @@ class EWC(object):
         self.importance = importance
         self.freeze_layer = freeze_layers
 
+        if self.freeze_layer is None:
+            self.freeze_layer = []
+
         self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad and (n[5] == 'r' or int(n[5]) not in self.freeze_layer) }
         self._means = {}
         self._precision_matrices = self._diag_fisher()

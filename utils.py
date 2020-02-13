@@ -46,8 +46,7 @@ def getArguments():
                         help='Using First order MAML')
     parser.add_argument('--freeze-layer', nargs='+', type=int, metavar='LR',
                         help='List of frozen layers')
-    parser.add_argument('--only-linear', type=str2bool, default=False,
-                        help='train only classifier (default False)')
+
     parser.add_argument('--use-ewc', type=str2bool, default=False,
                         help='Use EWC')
     parser.add_argument('--ewc-importance', type=float, default=100, metavar='LR',
@@ -58,6 +57,9 @@ def getArguments():
 
     parser.add_argument('--algorithm', type=str, default='MAML',
                         help='[MAML, ANIL, FT]')
+    parser.add_argument('--remap-label', type=str2bool, default=True, metavar='LR',
+                        help='Used in original MAML, to remap Label to amount of ways')
+
     parser.add_argument('--filter-reg', type=str2bool, default=False,
                         help='Using or not sparse-group regularization in conv filter (default False)')
     parser.add_argument('--cost-theta', type=float, default=0.01,

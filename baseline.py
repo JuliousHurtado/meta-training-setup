@@ -35,7 +35,7 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 
 warnings.showwarning = warn_with_traceback
 
-def getDataset(name_dataset, ways, shots):
+def getDataset(name_dataset, ways, shots, remapLabels = True):
     generators = {}
     if name_dataset == 'Omniglot':
         omniglot = l2l.vision.datasets.FullOmniglot(root='./data',
@@ -78,9 +78,11 @@ def getDataset(name_dataset, ways, shots):
                     NWays(dataset, ways),
                     KShots(dataset, 2*shots),
                     LoadData(dataset),
-                    RemapLabels(dataset),
-                    ConsecutiveLabels(train_dataset),
                 ]
+
+            if remapLabels:
+                transforms.append(RemapLabels(dataset))
+                transforms.append(ConsecutiveLabels(train_dataset))
 
             generators[mode] = l2l.data.TaskDataset(dataset,
                                        task_transforms=transforms,
@@ -129,6 +131,7 @@ def main(
         args=None,
         fine_tuning=False,
         ):
+
     opt = optim.Adam(meta_alg.parameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
 
@@ -251,7 +254,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    model = getModel(args.input_channel, args.ways, device)
+    model = getModel(args.input_channel, args.init_ways, device)
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,
@@ -261,7 +264,7 @@ if __name__ == '__main__':
     # print(len(list(meta_model.getParams())))
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots)
+    data_generators = getDataset(args.dataset, args.ways, args.shots, args.rempa_label)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
