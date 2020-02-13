@@ -31,7 +31,7 @@ def test_normal(model, data_loader, device):
     for input, target in data_loader:
         input, target = input.to(device), target.long().to(device)
         o = model[0](input)
-        output = model[1](o)
+        output = model[1].forwardHead(o)
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
 
@@ -94,10 +94,6 @@ def loadModel(args, file_name, file_head, device):
 
     checkpoint = torch.load(os.path.join(base_path,file_head), map_location=device)
     model_head.load_state_dict(checkpoint['checkpoint'])
-
-    print("Model:")
-    for (name1, param1), (name2, param2) in zip(model_body.named_parameters(), model_head.named_parameters()):
-        print(name1, ': ', (param1 - param2).sum())
 
     return model_body, model_head
 

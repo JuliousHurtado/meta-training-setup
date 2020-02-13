@@ -15,6 +15,7 @@ from torchvision.datasets import ImageFolder, SVHN, CIFAR10
 import learn2learn as l2l
 from learn2learn.data.transforms import KShots, LoadData, RemapLabels, ConsecutiveLabels
 from method.meta_transform import NWays
+from method.ewc import EWC
 
 from utils import saveValues, getArguments, getModel, \
                     getAlgorithm, getRegularizer, create_bookkeeping, \
@@ -40,7 +41,7 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
-def getDataset(name_dataset, ways, shots, fine_tuning):
+def getDataset(name_dataset, ways, shots, fine_tuning, ewc = False):
     generators = {}
     transform_data = transforms.Compose([
             transforms.Resize(84),
@@ -91,6 +92,12 @@ def getDataset(name_dataset, ways, shots, fine_tuning):
 
     else:
         raise Exception('Dataset {} not supported'.format(name_dataset))
+
+    if ewc:
+        dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
+        dataloader = torch.utils.data.DataLoader(dataset_train, batch_size=64)
+
+        generators['sample'] = dataloader.dataset.get_sample(300)
 
     return generators
 
@@ -169,7 +176,11 @@ def main(
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
         if fine_tuning:
-            evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device)
+            ewc = None
+            if args['use_ewc']:
+                ewc = EWC(model, data_generators['sample'], args['importance'], freeze_layer)
+            
+            evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device, ewc)
             meta_train_error = evaluation_error
             meta_train_accuracy = evaluation_accuracy.item()
 
@@ -237,7 +248,7 @@ if __name__ == '__main__':
                     args.sparse_reg)
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning)
+    data_generators = getDataset(args.dataset, args.ways, args.shots, fine_tuning, args.ewc)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,

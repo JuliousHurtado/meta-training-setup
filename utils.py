@@ -48,6 +48,8 @@ def getArguments():
                         help='List of frozen layers')
     parser.add_argument('--only-linear', type=str2bool, default=False,
                         help='train only classifier (default False)')
+    parser.add_argument('--use-ewc', type=str2bool, default=False,
+                        help='Use EWC')
 
     parser.add_argument('--seed', type=int, default=42, metavar='S',
                         help='random seed (default: 42)')
@@ -174,7 +176,7 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     valid_accuracy = accuracy(predictions, evaluation_labels)
     return valid_error, valid_accuracy
 
-def train_normal(data_loader, learner, loss, optimizer, regs, device):
+def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None):
     learner.train()
     running_loss = 0
     running_corrects = 0
@@ -191,6 +193,9 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device):
         if len(regs) > 0:
             for reg in regs:
                 l += reg(learner)
+
+        if ewc is not None:
+            l += ewc.penalty(learner)
 
         l.backward()
         optimizer.step()
