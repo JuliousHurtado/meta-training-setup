@@ -48,7 +48,7 @@ class EWC(object):
     def penalty(self, model: nn.Module):
         loss = 0
         for n, p in model.named_parameters():
-            if n[5] == 'r' or int(n[5]) not in self.freeze_layer
+            if n[5] == 'r' or int(n[5]) not in self.freeze_layer:
                 _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
                 loss += _loss.sum()
         return loss * self.importance 

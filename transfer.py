@@ -41,6 +41,15 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
+def get_sample(dataset, sample_size):
+    sample_idx = random.sample(range(len(dataset)), sample_size)
+    temp = []
+    for img in dataset.digit_data[sample_idx]:
+        if dataset.transform:
+            img = dataset.transform(Image.fromarray(img)).unsqueeze(0)
+        temp.append(img)
+    return temp
+
 def getDataset(name_dataset, ways, shots, fine_tuning, ewc = False):
     generators = {}
     transform_data = transforms.Compose([
@@ -95,9 +104,7 @@ def getDataset(name_dataset, ways, shots, fine_tuning, ewc = False):
 
     if ewc:
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
-        dataloader = torch.utils.data.DataLoader(dataset_train, batch_size=64)
-
-        generators['sample'] = dataloader.dataset.get_sample(300)
+        generators['sample'] = get_sample(dataset_train,300)
 
     return generators
 
