@@ -159,8 +159,8 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     # Separate data into adaptation/evalutation sets
     adaptation_indices = torch.zeros(data.size(0), dtype=torch.bool)#.byte()
     adaptation_indices[torch.arange(shots*ways) * 2] = 1
-    adaptation_data, adaptation_labels = data[adaptation_indices], labels[adaptation_indices]
-    evaluation_data, evaluation_labels = data[~adaptation_indices], labels[~adaptation_indices]
+    adaptation_data, adaptation_labels = data[adaptation_indices], labels[adaptation_indices].long()
+    evaluation_data, evaluation_labels = data[~adaptation_indices], labels[~adaptation_indices].long()
 
     # Adapt the model
     for step in range(adaptation_steps):

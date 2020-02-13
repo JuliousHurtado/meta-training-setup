@@ -82,7 +82,7 @@ def getDataset(name_dataset, ways, shots, remapLabels = True):
 
             if remapLabels:
                 transforms.append(RemapLabels(dataset))
-                transforms.append(ConsecutiveLabels(train_dataset))
+            transforms.append(ConsecutiveLabels(train_dataset))
 
             generators[mode] = l2l.data.TaskDataset(dataset,
                                        task_transforms=transforms,
