@@ -264,7 +264,7 @@ if __name__ == '__main__':
     # print(len(list(meta_model.getParams())))
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots, args.rempa_label)
+    data_generators = getDataset(args.dataset, args.ways, args.shots, args.remap_label)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
