@@ -132,7 +132,7 @@ def main(
         fine_tuning=False,
         ):
 
-    opt = optim.Adam(meta_alg.parameters(), lr)
+    opt = optim.Adam(meta_alg.parameters(), lr, weight_decay=args['weight_decay'])
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
@@ -232,7 +232,10 @@ def main(
 
     if args['save_model']:
         name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
-        saveValues(name_file, results, meta_alg.module, args)
+        if fine_tuning:
+            saveValues(name_file, results, meta_alg, args)
+        else:
+            saveValues(name_file, results, meta_alg.module, args)
 
 if __name__ == '__main__':
     parser = getArguments()

@@ -32,6 +32,8 @@ def getArguments():
 
     parser.add_argument('--iterations', type=int, default=15000, metavar='N',
                         help='number of iterations (default: 15000)')
+    parser.add_argument('--weigth-decay', type=int, default=0.0, metavar='N',
+                        help='weigth decay of Adam')
 
     parser.add_argument('--dataset', type=str, default='Omniglot', metavar='C',
                         help='[Omniglot, MiniImagenet, cifar10, SVHN]')
