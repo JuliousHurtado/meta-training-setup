@@ -257,7 +257,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    model = getModel(args.input_channel, args.init_ways, device)
+    model = getModel(args.input_channel, args.init_ways, args.hidden_size, device)
     meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,

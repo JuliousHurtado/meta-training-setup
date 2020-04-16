@@ -25,6 +25,8 @@ def getArguments():
                         help='number of ways (default: 5)')
     parser.add_argument('--shots', type=int, default=5, metavar='N',
                         help='number of shots (default: 5)')
+    parser.add_argument('--hidden-size', type=int, default=32, metavar='N',
+                        help='number of shots (default: 5)')
     parser.add_argument('-tps', '--tasks-per-step', type=int, default=8, metavar='N',
                         help='tasks per step (default: 8)')
     parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
@@ -32,7 +34,7 @@ def getArguments():
 
     parser.add_argument('--iterations', type=int, default=15000, metavar='N',
                         help='number of iterations (default: 15000)')
-    parser.add_argument('--weight_decay', type=int, default=0.0, metavar='N',
+    parser.add_argument('--weight_decay', type=float, default=0.0, metavar='N',
                         help='weigth decay of Adam')
 
     parser.add_argument('--dataset', type=str, default='Omniglot', metavar='C',
@@ -91,11 +93,11 @@ def saveValues(name_file, results, model, args):
             'checkpoint': model.state_dict()
             }, name_file)
 
-def getModel(input_channels, ways = 5, device = 'cpu'):
+def getModel(input_channels, ways=5, hidden_size=32, device='cpu'):
     if input_channels == 1:
         return OmniglotCNN(ways).to(device)
     elif input_channels == 3:
-        return MiniImagenetCNN(ways).to(device)
+        return MiniImagenetCNN(ways, hidden_size).to(device)
     else:
         raise Exception('Input Channels must be 1 or 3, not: {}'.format(input_channels))
 
