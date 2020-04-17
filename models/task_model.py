@@ -7,10 +7,10 @@ import torchvision.models as models
 from learn2learn.vision.models import MiniImagenetCNN
 
 class TaskEspecific(nn.Module):
-    def __init__(self, filters):
+    def __init__(self, filters, device):
         super(TaskEspecific, self).__init__()
 
-        self.features = self.getExtractor()
+        self.features = self.getExtractor().to(device)
         self.filters = filters
 
         self.mlp = []
@@ -50,7 +50,7 @@ class TaskModel(nn.Module):
 
         filters = self.getFilterZero()
 
-        self.task_model = TaskEspecific(filters)
+        self.task_model = TaskEspecific(filters, device)
 
     def setLinear(self, task, num_classes=0):
         if task not in self.linear_clfs:
@@ -75,7 +75,7 @@ class TaskModel(nn.Module):
                     _,index = zip(*sorted(zip(n, index)))
 
                     selected_filters[count] = { 
-                                'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]),
+                                'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(device),
                                 'n_filters': int(sizes[0]*self.p_filter),
                                 'sizes': sizes}
                     p.weight[selected_filters[count]['index']].mul(0)

@@ -95,10 +95,6 @@ if __name__ == '__main__':
     parser = getArguments()
     args = parser.parse_args()
 
-    fine_tuning = False
-    if args.algorithm == 'FT':
-        fine_tuning = True
-
     use_cuda = torch.cuda.is_available()
 
     random.seed(args.seed)
@@ -109,7 +105,7 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    device = torch.device("cpu" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
     
     model = TaskModel(os.path.join('./results', args.load_model), 0.5, device)
     model.setLinear(0, 10)
