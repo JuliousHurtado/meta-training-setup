@@ -37,63 +37,26 @@ warnings.showwarning = warn_with_traceback
 
 def getDataset(name_dataset, ways, shots, remapLabels = True):
     generators = {}
-    if name_dataset == 'Omniglot':
-        omniglot = l2l.vision.datasets.FullOmniglot(root='./data',
-                                                transform=transforms.Compose([
-                                                    transforms.Resize(28, interpolation=LANCZOS),
-                                                    transforms.ToTensor(),
-                                                    lambda x: 1.0 - x,
-                                                ]),
-                                                download=True)
-        dataset = l2l.data.MetaDataset(omniglot)
-        classes = list(range(1623))
-        random.shuffle(classes)
+    train_dataset = None
+    for mode, num_tasks in zip(['train','validation','test'],[20000,600,600]):
+        dataset = l2l.data.MetaDataset(l2l.vision.datasets.MiniImagenet(root='./data', mode=mode))
 
-        for mode, num_tasks, split in zip(['train','validation','test'],
-                                        [20000,1024,1024],[[0,1100],[1100,1200],[1200,-1]]):
+        if train_dataset is None:
+            train_dataset = dataset
 
-            transforms = [
-                l2l.data.transforms.FilterLabels(dataset, classes[split[0]:split[1]]),
-                l2l.data.transforms.NWays(dataset, ways),
-                l2l.data.transforms.KShots(dataset, 2*shots),
-                l2l.data.transforms.LoadData(dataset),
-                l2l.data.transforms.RemapLabels(dataset),
-                l2l.data.transforms.ConsecutiveLabels(dataset),
-                l2l.vision.transforms.RandomClassRotation(dataset, [0.0, 90.0, 180.0, 270.0])
-            ]
-
-            generators[mode] = l2l.data.TaskDataset(dataset,
-                                       task_transforms=transforms,
-                                       num_tasks=num_tasks)
-
-    elif name_dataset == 'MiniImagenet':
-        train_dataset = None
-        for mode, num_tasks in zip(['train','validation','test'],[20000,600,600]):
-            dataset = l2l.data.MetaDataset(l2l.vision.datasets.MiniImagenet(root='./data', mode=mode))
-
-            if train_dataset is None:
-                train_dataset = dataset
-
-            transforms = [
+        transforms = [
                     NWays(dataset, ways),
                     KShots(dataset, 2*shots),
                     LoadData(dataset),
                 ]
 
-            if remapLabels:
-                transforms.append(RemapLabels(dataset))
-            transforms.append(ConsecutiveLabels(train_dataset))
+        if remapLabels:
+            transforms.append(RemapLabels(dataset))
+        transforms.append(ConsecutiveLabels(train_dataset))
 
-            generators[mode] = l2l.data.TaskDataset(dataset,
+        generators[mode] = l2l.data.TaskDataset(dataset,
                                        task_transforms=transforms,
                                        num_tasks=num_tasks)
-    elif name_dataset == 'Tiny-FT':
-        for mode in ['train','validation','test']:
-            dataset = l2l.vision.datasets.MiniImagenet(root='./data', mode=mode)    
-            generators[mode] = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
-
-    else:
-        raise Exception('Dataset {} not supported'.format(dataset))
 
     return generators
 
@@ -152,19 +115,13 @@ def main(
         meta_valid_accuracy = 0.0
         meta_test_error = 0.0
         meta_test_accuracy = 0.0
-        if fine_tuning:
-            evaluation_error, evaluation_accuracy = train_normal(data_generators['train'], meta_alg, loss, opt, regs, device)
-            meta_train_error = evaluation_error
-            meta_train_accuracy = evaluation_accuracy.item()
 
-            addResults(meta_alg, data_generators, results, iteration, meta_train_error, meta_train_accuracy, 1, device)
-        else:
-            opt.zero_grad()
-            for task in range(meta_batch_size):
-                # Compute meta-training loss
-                learner = meta_alg.clone()
-                batch = data_generators['train'].sample()
-                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+        opt.zero_grad()
+        for task in range(meta_batch_size):
+            # Compute meta-training loss
+            learner = meta_alg.clone()
+            batch = data_generators['train'].sample()
+            evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                    learner,
                                                                    regs,
                                                                    loss,
@@ -172,16 +129,16 @@ def main(
                                                                    shots,
                                                                    ways,
                                                                    device)
-                #meta_alg.printValue()
-                #learner.printValue()
-                evaluation_error.backward()
-                meta_train_error += evaluation_error.item()
-                meta_train_accuracy += evaluation_accuracy.item()
+            #meta_alg.printValue()
+            #learner.printValue()
+            evaluation_error.backward()
+            meta_train_error += evaluation_error.item()
+            meta_train_accuracy += evaluation_accuracy.item()
 
-                # Compute meta-validation loss
-                learner = meta_alg.clone()
-                batch = data_generators['validation'].sample()
-                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+            # Compute meta-validation loss
+            learner = meta_alg.clone()
+            batch = data_generators['validation'].sample()
+            evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                    learner,
                                                                    regs,
                                                                    loss,
@@ -189,13 +146,13 @@ def main(
                                                                    shots,
                                                                    ways,
                                                                    device)
-                meta_valid_error += evaluation_error.item()
-                meta_valid_accuracy += evaluation_accuracy.item()
+            meta_valid_error += evaluation_error.item()
+            meta_valid_accuracy += evaluation_accuracy.item()
 
-                # Compute meta-testing loss
-                learner = meta_alg.clone()
-                batch = data_generators['test'].sample()
-                evaluation_error, evaluation_accuracy = fast_adapt(batch,
+            # Compute meta-testing loss
+            learner = meta_alg.clone()
+            batch = data_generators['test'].sample()
+            evaluation_error, evaluation_accuracy = fast_adapt(batch,
                                                                    learner,
                                                                    regs,
                                                                    loss,
@@ -203,32 +160,32 @@ def main(
                                                                    shots,
                                                                    ways,
                                                                    device)
-                meta_test_error += evaluation_error.item()
-                meta_test_accuracy += evaluation_accuracy.item()
+            meta_test_error += evaluation_error.item()
+            meta_test_accuracy += evaluation_accuracy.item()
 
-            if iteration % 500 == 0:
-                # Print some metrics
-                print('\n')
-                print('Iteration', iteration)
-                print('Meta Train Error', meta_train_error / meta_batch_size)
-                print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
-                print('Meta Valid Error', meta_valid_error / meta_batch_size)
-                print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
-                print('Meta Test Error', meta_test_error / meta_batch_size)
-                print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
-                print('\n', flush=True)
+        if iteration % 500 == 0:
+            # Print some metrics
+            print('\n')
+            print('Iteration', iteration)
+            print('Meta Train Error', meta_train_error / meta_batch_size)
+            print('Meta Train Accuracy', meta_train_accuracy / meta_batch_size)
+            print('Meta Valid Error', meta_valid_error / meta_batch_size)
+            print('Meta Valid Accuracy', meta_valid_accuracy / meta_batch_size)
+            print('Meta Test Error', meta_test_error / meta_batch_size)
+            print('Meta Test Accuracy', meta_test_accuracy / meta_batch_size)
+            print('\n', flush=True)
 
-            results['train_loss'].append(meta_train_error / meta_batch_size)
-            results['train_acc'].append(meta_train_accuracy / meta_batch_size)
-            results['val_loss'].append(meta_valid_error / meta_batch_size)
-            results['val_acc'].append(meta_valid_accuracy / meta_batch_size)
-            results['test_loss'].append(meta_test_error / meta_batch_size)
-            results['test_acc'].append(meta_test_accuracy / meta_batch_size)
+        results['train_loss'].append(meta_train_error / meta_batch_size)
+        results['train_acc'].append(meta_train_accuracy / meta_batch_size)
+        results['val_loss'].append(meta_valid_error / meta_batch_size)
+        results['val_acc'].append(meta_valid_accuracy / meta_batch_size)
+        results['test_loss'].append(meta_test_error / meta_batch_size)
+        results['test_acc'].append(meta_test_accuracy / meta_batch_size)
 
-            # Average the accumulated gradients and optimize
-            for p in meta_alg.parameters():
-                p.grad.data.mul_(1.0 / meta_batch_size)
-            opt.step()
+        # Average the accumulated gradients and optimize
+        for p in meta_alg.parameters():
+            p.grad.data.mul_(1.0 / meta_batch_size)
+        opt.step()
 
     if args['save_model']:
         name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])

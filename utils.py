@@ -194,7 +194,7 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None
 
         optimizer.zero_grad()
 
-        out = learner(inputs)
+        out, labels = learner(inputs, labels)
         _, preds = torch.max(out, 1)
         l = loss(out, labels)
 
@@ -218,6 +218,6 @@ def test_normal(model, data_loader, device):
     correct = 0
     for input, target in data_loader:
         input, target = input.to(device), target.long().to(device)
-        output = model(input)
+        output, target = model(input, target)
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
