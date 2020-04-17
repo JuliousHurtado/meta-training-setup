@@ -10,14 +10,15 @@ class TaskEspecific(nn.Module):
     def __init__(self, filters, device):
         super(TaskEspecific, self).__init__()
 
-        self.features = self.getExtractor().to(device)
+        self.features = self.getExtractor()
         self.filters = filters
 
-        self.mlp = []
+        mlp = []
         for elem in filters:
             #Partamos simple con la función que crea estos filtros
             s = filters[elem]['sizes']
-            self.mlp.append(nn.Linear(512, filters[elem]['n_filters']*s[1]*s[2]*s[3]))
+            mlp.append(nn.Linear(512, filters[elem]['n_filters']*s[1]*s[2]*s[3]))
+        self.mlp = nn.Sequential(*mlp)
 
     def getExtractor(self):
         extractor = models.resnet18(pretrained=True)
@@ -54,8 +55,8 @@ class TaskModel(nn.Module):
 
     def setLinear(self, task, num_classes=0):
         if task not in self.linear_clfs:
-            self.linear_clfs[task] = nn.Linear(self.meta_model.linear.weight.size(1), num_classes)
-        self.meta_model.linear = self.linear_clfs[task].to(self.device)
+            self.linear_clfs[task] = nn.Linear(self.meta_model.linear.weight.size(1), num_classes).to(self.device)
+        self.meta_model.linear = self.linear_clfs[task]
 
     def loadMetaModel(self, path):
         checkpoint = torch.load(path, map_location=self.device)
@@ -75,7 +76,7 @@ class TaskModel(nn.Module):
                     _,index = zip(*sorted(zip(n, index)))
 
                     selected_filters[count] = { 
-                                'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(device),
+                                'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(self.device),
                                 'n_filters': int(sizes[0]*self.p_filter),
                                 'sizes': sizes}
                     p.weight[selected_filters[count]['index']].mul(0)

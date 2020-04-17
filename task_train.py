@@ -28,23 +28,24 @@ def getDataset(name_dataset):
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
+    bs = 4
     if name_dataset == 'SVHN':
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)        
-        generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
-        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
         dataset = SVHN('./data/', split='test', transform=transform_data, download=True)
-        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
     elif name_dataset == 'cifar10':
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
         dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
-        generators['train'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
-        generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
-        generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=64)
+        generators['train'] = torch.utils.data.DataLoader(dataset_train, batch_size=bs)
+        generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=bs)
+        generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=bs)
 
     else:
         raise Exception('Dataset {} not supported'.format(name_dataset))
@@ -107,7 +108,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = TaskModel(os.path.join('./results', args.load_model), 0.5, device)
+    model = TaskModel(os.path.join('./results', args.load_model), 0.5, device).to(device)
     model.setLinear(0, 10)
     data_generators = getDataset(args.dataset)
 
