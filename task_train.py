@@ -28,7 +28,7 @@ def getDataset(name_dataset):
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-    bs = 4
+    bs = 64
     if name_dataset == 'SVHN':
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)        
         generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
@@ -71,7 +71,7 @@ def addResults(model, data_generators, results, iteration, train_error, train_ac
     results['test_acc'].append(test_accuracy)
 
 def main(model, data_generators, device, lr=0.003, args=None):
-    opt = optim.Adam(model.task_model.parameters(), lr)
+    opt = optim.Adam(model.getTaskParameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = TaskModel(os.path.join('./results', args.load_model), 0.5, device).to(device)
+    model = TaskModel(os.path.join('./results', args.load_model), args['percentage_new_filter'], device).to(device)
     model.setLinear(0, 10)
     data_generators = getDataset(args.dataset)
 

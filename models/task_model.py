@@ -2,6 +2,7 @@ import copy
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 import torchvision.models as models
 from learn2learn.vision.models import MiniImagenetCNN
@@ -12,6 +13,7 @@ class TaskEspecific(nn.Module):
 
         self.features = self.getExtractor()
         self.filters = filters
+        self.grads = {}
 
         mlp = []
         for elem in filters:
@@ -28,6 +30,12 @@ class TaskEspecific(nn.Module):
             p.requires_grad = False
 
         return extractor
+
+    # def saveGrad(self, name):
+    #     def hook(grad):
+    #         #print(grad)
+    #         self.grads[name] = grad
+    #     return hook
 
     def forward(self, x):
         x = self.features(x).view(x.size(0), -1)
@@ -77,6 +85,7 @@ class TaskModel(nn.Module):
 
                     selected_filters[count] = { 
                                 'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(self.device),
+                                'no_index': torch.tensor(index[int(sizes[0]*self.p_filter):]).to(self.device),
                                 'n_filters': int(sizes[0]*self.p_filter),
                                 'sizes': sizes}
                     p.weight[selected_filters[count]['index']].mul(0)
@@ -85,16 +94,39 @@ class TaskModel(nn.Module):
 
         return selected_filters
 
-    def setFilters(self, f):
-        count = 0
-        for elem in self.meta_model.base:
-            for p in elem.children():
-                if isinstance(p, torch.nn.Conv2d):
-                    p.weight[self.task_model.filters[count]['index']].add(f[count]) 
-                    count += 1
+    # def setFilters(self, f):
+    #     count = 0
+    #     for elem in self.meta_model.base:
+    #         for p in elem.children():
+    #             if isinstance(p, torch.nn.Conv2d):
+    #                 p.weight[self.task_model.filters[count]['index']].add(f[count])
+    #                 count += 1
 
-    def forward(self, x, y):
-        if self.training:
+    # def printGradConv(self):
+    #     count = 0
+    #     for elem in self.meta_model.base:
+    #         for p in elem.children():
+    #             if isinstance(p, torch.nn.Conv2d):
+    #                 print(p.weight[self.task_model.filters[count]['index']].grad)
+    #                 count += 1
+
+    def getTaskParameters(self):
+        params = []
+        for p in self.task_model.mlp.parameters():
+            params.append(p)
+
+        for p in self.meta_model.linear.parameters():
+            params.append(p)
+
+        return params
+
+    # def saveGradTask(self):
+    #     for i, elem in enumerate(self.task_model.filters):
+    #         self.task_model.mlp[i].weight.register_hook(print)
+
+    def alternative_forward(self, x, y):
+        x.requires_grad = True
+        if False:#self.training:
             p = int(x.size(0)/2)
             x1 = x[:p]
             y1 = y[:p]
@@ -105,8 +137,23 @@ class TaskModel(nn.Module):
             x2 = copy.deepcopy(x)
             y2 = y
 
-        f = self.task_model(x1)
+        f = self.task_model(x)
         self.setFilters(f)
-        out = self.meta_model(x2)
+        out = self.meta_model(x)
 
         return out, y2
+
+    def forward(self, x, y):
+        f = self.task_model(x)
+        for i, elem in enumerate(self.meta_model.base):
+            x1 = F.conv2d(x, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            x2 = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            x = torch.cat([x1,x2], dim=1)
+            
+            x = elem.normalize(x)
+            x = elem.relu(x)
+            x = elem.max_pool(x)
+
+        out = self.meta_model.linear(x.view(-1, 25 * 32))
+        return out, y
+        

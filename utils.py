@@ -21,68 +21,49 @@ def str2bool(v):
 def getArguments():
     parser = argparse.ArgumentParser(description='Learn2Learn MNIST Example')
 
-    parser.add_argument('--ways', type=int, default=5, metavar='N',
-                        help='number of ways (default: 5)')
-    parser.add_argument('--shots', type=int, default=5, metavar='N',
-                        help='number of shots (default: 5)')
-    parser.add_argument('--hidden-size', type=int, default=32, metavar='N',
-                        help='number of shots (default: 5)')
-    parser.add_argument('-tps', '--tasks-per-step', type=int, default=8, metavar='N',
-                        help='tasks per step (default: 8)')
-    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
-                        help='steps per fast adaption (default: 5)')
 
-    parser.add_argument('--iterations', type=int, default=15000, metavar='N',
-                        help='number of iterations (default: 15000)')
-    parser.add_argument('--weight_decay', type=float, default=0.0, metavar='N',
-                        help='weigth decay of Adam')
+    #--------------------------------Meta Train-----------------------------------------#
+    parser.add_argument('--ways', type=int, default=5)
+    parser.add_argument('--shots', type=int, default=5)
+    parser.add_argument('--fast-lr', type=float, default=0.5)
+    parser.add_argument('-tps', '--tasks-per-step', type=int, default=8)
+    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5)
+    parser.add_argument('--first-order', type=str2bool, default=False)
 
+    #--------------------------------Model----------------------------------------------#
+    parser.add_argument('--hidden-size', type=int, default=32)
+    parser.add_argument('--percentage-new-filter', type=float, default=0.2)
+
+
+    #--------------------------------Training-------------------------------------------#
+    parser.add_argument('--iterations', type=int, default=80)
+    parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--dataset', type=str, default='Omniglot', metavar='C',
                         help='[Omniglot, MiniImagenet, cifar10, SVHN]')
-    parser.add_argument('--input-channel', type=int, default=1, metavar='C',
-                        help='1 for using black and white image and 3 for RGB')
+    parser.add_argument('--lr', type=float, default=0.003)
+    
+    
 
-    parser.add_argument('--lr', type=float, default=0.003, metavar='LR',
-                        help='learning rate (default: 0.003)')
-    parser.add_argument('--fast-lr', type=float, default=0.5, metavar='LR',
-                        help='learning rate for MAML (default: 0.5)')
-    parser.add_argument('--first-order', type=str2bool, default=False, metavar='LR',
-                        help='Using First order MAML')
-    parser.add_argument('--freeze-layer', nargs='+', type=int, metavar='LR',
-                        help='List of frozen layers')
-
+    #------------------------------CF-Regularization-------------------------------------#
     parser.add_argument('--use-ewc', type=str2bool, default=False,
                         help='Use EWC')
-    parser.add_argument('--ewc-importance', type=float, default=100, metavar='LR',
-                        help='learning rate for MAML (default: 0.5)')
+    parser.add_argument('--ewc-importance', type=float, default=100)
 
-    parser.add_argument('--seed', type=int, default=42, metavar='S',
-                        help='random seed (default: 42)')
 
-    parser.add_argument('--algorithm', type=str, default='MAML',
-                        help='[MAML, ANIL, FT]')
-    parser.add_argument('--remap-label', type=str2bool, default=True, metavar='LR',
-                        help='Used in original MAML, to remap Label to amount of ways')
+    #--------------------------------Extra----------------------------------------------#
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--save-model', type=str2bool, default=True)
+    parser.add_argument('--load-model', type=str, default='./results/temp.pth')
+    parser.add_argument('--load-head', type=str, default='')
 
-    parser.add_argument('--filter-reg', type=str2bool, default=False,
-                        help='Using or not sparse-group regularization in conv filter (default False)')
-    parser.add_argument('--cost-theta', type=float, default=0.01,
-                        help='cost value of filter reg (default 0.01)')
-    parser.add_argument('--linear-reg', type=str2bool, default=False,
-                        help='Using or not sparse-group regularization in linear layer (default False)')
-    parser.add_argument('--cost-omega', type=float, default=0.01,
-                        help='cost value of linear reg (default 0.01)')
-    parser.add_argument('--sparse-reg', type=str2bool, default=False,
-                        help='Using or not sparse-group regularization in conv filter (default False)')
 
-    parser.add_argument('--save-model', type=str2bool, default=True, metavar='LR',
-                        help='save model (default True)')
-    parser.add_argument('--load-model', type=str, default='', metavar='LR',
-                        help='Model to Load, ./results/models/name_file')
-    parser.add_argument('--load-head', type=str, default='', metavar='LR',
-                        help='Head of the modelo Load from , ./results/models/name_file')
-    parser.add_argument('--init-ways', type=int, default=200, metavar='N',
-                        help='number of ways (default: 5)')
+    #---------------------------------Regularization-------------------------------------#
+    parser.add_argument('--filter-reg', type=str2bool, default=False)
+    parser.add_argument('--sparse-reg', type=str2bool, default=False)
+    parser.add_argument('--cost-theta', type=float, default=0.01)
+    parser.add_argument('--linear-reg', type=str2bool, default=False)
+    parser.add_argument('--cost-omega', type=float, default=0.01)
+
 
     return parser
 
@@ -211,7 +192,7 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None
         running_loss += l.item()
         running_corrects += torch.sum(preds == labels.data)
 
-    return running_loss / len(data_loader), running_corrects / len(data_loader)
+    return running_loss / len(data_loader), running_corrects.item() / len(data_loader)
 
 def test_normal(model, data_loader, device):
     model.eval()
