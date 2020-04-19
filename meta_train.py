@@ -189,18 +189,11 @@ def main(
 
     if args['save_model']:
         name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
-        if fine_tuning:
-            saveValues(name_file, results, meta_alg, args)
-        else:
-            saveValues(name_file, results, meta_alg.module, args)
+        saveValues(name_file, results, meta_alg.module, args)
 
 if __name__ == '__main__':
     parser = getArguments()
     args = parser.parse_args()
-
-    fine_tuning = False
-    if args.algorithm == 'FT':
-        fine_tuning = True
 
     use_cuda = torch.cuda.is_available()
 
@@ -238,5 +231,4 @@ if __name__ == '__main__':
          adaptation_steps=args.fast_adaption_steps,
          num_iterations=args.iterations,
          seed=args.seed,
-         args=vars(parser.parse_args()),
-         fine_tuning=fine_tuning)
+         args=vars(parser.parse_args()))
