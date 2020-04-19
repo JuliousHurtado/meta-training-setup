@@ -19,7 +19,8 @@ class TaskEspecific(nn.Module):
         for elem in filters:
             #Partamos simple con la función que crea estos filtros
             s = filters[elem]['sizes']
-            mlp.append(nn.Linear(512, filters[elem]['n_filters']*s[1]*s[2]*s[3]))
+            if filters[elem]['n_filters'] > 0:
+                mlp.append(nn.Linear(512, filters[elem]['n_filters']*s[1]*s[2]*s[3]))
         self.mlp = nn.Sequential(*mlp)
 
     def getExtractor(self):
@@ -42,7 +43,8 @@ class TaskEspecific(nn.Module):
         f = {}
         for i, elem in enumerate(self.filters):
             s = self.filters[elem]['sizes']
-            f[elem] =  self.mlp[i](x).view(-1,self.filters[elem]['n_filters'],s[1],s[2],s[3]).mean(dim=0)
+            if self.filters[elem]['n_filters'] > 0:
+                f[elem] =  self.mlp[i](x).view(-1,self.filters[elem]['n_filters'],s[1],s[2],s[3]).mean(dim=0)
         return f
 
 class TaskModel(nn.Module):
@@ -83,12 +85,25 @@ class TaskModel(nn.Module):
                     index = list(range(sizes[0]))
                     _,index = zip(*sorted(zip(n, index)))
 
+                    if self.p_filter == 0.0:
+                        f_replace = None
+                        no_index = index
+                        n_filters = 0
+                    elif self.p_filter == 1.0:
+                        f_replace = index
+                        no_index = None
+                        n_filters = sizes[0]
+                    else:
+                        f_replace = torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(self.device)
+                        no_index = torch.tensor(index[int(sizes[0]*self.p_filter):]).to(self.device)
+                        n_filters = int(sizes[0]*self.p_filter)
+                    
                     selected_filters[count] = { 
-                                'index': torch.tensor(index[:int(sizes[0]*self.p_filter)]).to(self.device),
-                                'no_index': torch.tensor(index[int(sizes[0]*self.p_filter):]).to(self.device),
-                                'n_filters': int(sizes[0]*self.p_filter),
+                                'index': f_replace,
+                                'no_index': no_index,
+                                'n_filters': n_filters,
                                 'sizes': sizes}
-                    p.weight[selected_filters[count]['index']].mul(0)
+                    #p.weight[selected_filters[count]['index']].mul(0)
 
                     count += 1
 
@@ -146,9 +161,14 @@ class TaskModel(nn.Module):
     def forward(self, x, y):
         f = self.task_model(x)
         for i, elem in enumerate(self.meta_model.base):
-            x1 = F.conv2d(x, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
-            x2 = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
-            x = torch.cat([x1,x2], dim=1)
+            if self.p_filter == 0.0:
+                x = F.conv2d(x, elem.conv.weight, None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            elif self.p_filter == 1.0:
+                x = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            else:
+                x1 = F.conv2d(x, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x2 = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x = torch.cat([x1,x2], dim=1)
             
             x = elem.normalize(x)
             x = elem.relu(x)
