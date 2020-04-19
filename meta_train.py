@@ -214,8 +214,8 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    model = getModel(args.input_channel, args.init_ways, args.hidden_size, device)
-    meta_model = getAlgorithm(args.algorithm, model, args.fast_lr, args.first_order, args.freeze_layer)
+    model = getModel(3, args.ways, args.hidden_size, device)
+    meta_model = getAlgorithm('MAML', model, args.fast_lr, args.first_order, [])
     regs = getRegularizer( 
                     args.filter_reg, args.cost_theta,
                     args.linear_reg, args.cost_omega,
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     # print(len(list(meta_model.getParams())))
 
     #print(model)
-    data_generators = getDataset(args.dataset, args.ways, args.shots, args.remap_label)
+    data_generators = getDataset(args.dataset, args.ways, args.shots)
     #data_generators = getRandomDataset(args.ways, False)
 
     main(meta_model,
