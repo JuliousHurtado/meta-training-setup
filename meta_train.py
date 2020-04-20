@@ -188,7 +188,7 @@ def main(
         opt.step()
 
     if args['save_model']:
-        name_file = 'results/{}_{}'.format(str(time.time()),args['algorithm'])
+        name_file = 'results/{}_{}'.format(str(time.time()),args['cost_theta'])
         saveValues(name_file, results, meta_alg.module, args)
 
 if __name__ == '__main__':
