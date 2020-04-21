@@ -89,7 +89,7 @@ def main(model, data_generators, device, lr=0.003, args=None):
         addResults(model, data_generators, results, iteration, train_error, train_accuracy, device)
 
     if args['save_model']:
-        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),args['algorithm'], args['dataset'])
+        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),str(args['percentage_new_filter']), args['dataset'])
         saveValues(name_file, results, model, args)
         
 if __name__ == '__main__':
