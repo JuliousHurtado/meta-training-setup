@@ -89,7 +89,7 @@ def main(model, data_generators, device, lr=0.003, args=None):
         addResults(model, data_generators, results, iteration, train_error, train_accuracy, device)
 
     if args['save_model']:
-        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),str(args['percentage_new_filter']), args['dataset'])
+        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),str(args['percentage_new_filter']), str(args['split_batch']), args['dataset'])
         saveValues(name_file, results, model, args)
         
 if __name__ == '__main__':
@@ -108,10 +108,11 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, device).to(device)
+    model = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device).to(device)
     model.setLinear(0, 10)
     data_generators = getDataset(args.dataset)
 
+    #print(model)
     main(model,
          data_generators,
          device=device,

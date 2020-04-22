@@ -33,7 +33,7 @@ def getArguments():
     #--------------------------------Model----------------------------------------------#
     parser.add_argument('--hidden-size', type=int, default=32)
     parser.add_argument('--percentage-new-filter', type=float, default=0.2)
-
+    parser.add_argument('--split-batch', type=str2bool, default=False)
 
     #--------------------------------Training-------------------------------------------#
     parser.add_argument('--iterations', type=int, default=80)

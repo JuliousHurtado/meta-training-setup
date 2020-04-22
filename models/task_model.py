@@ -49,12 +49,13 @@ class TaskEspecific(nn.Module):
 
 class TaskModel(nn.Module):
     """docstring for TaskModel"""
-    def __init__(self, path_pre_tranied_model, percentage_filter, device):
+    def __init__(self, path_pre_tranied_model, percentage_filter, split_batch, device):
         super(TaskModel, self).__init__()
 
         self.linear_clfs = {}
         self.device = device
         self.p_filter = percentage_filter
+        self.split_batch = split_batch
 
         self.meta_model = MiniImagenetCNN(5)
         self.loadMetaModel(path_pre_tranied_model)
@@ -159,21 +160,32 @@ class TaskModel(nn.Module):
         return out, y2
 
     def forward(self, x, y):
-        f = self.task_model(x)
+        if self.training and self.split_batch:
+            p = int(x.size(0)/2)
+            x1 = x[:p]
+            y1 = y[:p]
+            x2 = x[p:]
+            y2 = y[p:]
+        else:
+            x1 = x[:]
+            x2 = x[:]
+            y2 = y
+
+        f = self.task_model(x1)
         for i, elem in enumerate(self.meta_model.base):
             if self.p_filter == 0.0:
-                x = F.conv2d(x, elem.conv.weight, None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x2 = F.conv2d(x2, elem.conv.weight, None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
             elif self.p_filter == 1.0:
-                x = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x2 = F.conv2d(x2, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
             else:
-                x1 = F.conv2d(x, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
-                x2 = F.conv2d(x, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
-                x = torch.cat([x1,x2], dim=1)
+                x_1 = F.conv2d(x2, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x_2 = F.conv2d(x2, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x2 = torch.cat([x_1,x_2], dim=1)
             
-            x = elem.normalize(x)
-            x = elem.relu(x)
-            x = elem.max_pool(x)
+            x2 = elem.normalize(x2)
+            x2 = elem.relu(x2)
+            x2 = elem.max_pool(x2)
 
-        out = self.meta_model.linear(x.view(-1, 25 * 32))
-        return out, y
+        out = self.meta_model.linear(x2.view(-1, 25 * 32))
+        return out, y2
         
