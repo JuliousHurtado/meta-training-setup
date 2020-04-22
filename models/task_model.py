@@ -49,7 +49,7 @@ class TaskEspecific(nn.Module):
 
 class TaskModel(nn.Module):
     """docstring for TaskModel"""
-    def __init__(self, path_pre_tranied_model, percentage_filter, split_batch, device):
+    def __init__(self, path_pre_tranied_model, percentage_filter, split_batch, device, load_meta_model=True):
         super(TaskModel, self).__init__()
 
         self.linear_clfs = {}
@@ -58,7 +58,8 @@ class TaskModel(nn.Module):
         self.split_batch = split_batch
 
         self.meta_model = MiniImagenetCNN(5)
-        self.loadMetaModel(path_pre_tranied_model)
+        if load_meta_model:
+            self.loadMetaModel(path_pre_tranied_model)
 
         filters = self.getFilterZero()
 
@@ -139,25 +140,6 @@ class TaskModel(nn.Module):
     # def saveGradTask(self):
     #     for i, elem in enumerate(self.task_model.filters):
     #         self.task_model.mlp[i].weight.register_hook(print)
-
-    def alternative_forward(self, x, y):
-        x.requires_grad = True
-        if False:#self.training:
-            p = int(x.size(0)/2)
-            x1 = x[:p]
-            y1 = y[:p]
-            x2 = x[p:]
-            y2 = y[p:]
-        else:
-            x1 = copy.deepcopy(x)
-            x2 = copy.deepcopy(x)
-            y2 = y
-
-        f = self.task_model(x)
-        self.setFilters(f)
-        out = self.meta_model(x)
-
-        return out, y2
 
     def forward(self, x, y):
         if self.training and self.split_batch:

@@ -70,8 +70,19 @@ def addResults(model, data_generators, results, iteration, train_error, train_ac
     results['val_acc'].append(valid_accuracy)
     results['test_acc'].append(test_accuracy)
 
+def loadModel(model, path_file, lr, device):
+    checkpoint = torch.load(os.path.join(path_file), map_location=device)
+
+    model.load_state_dict(checkpoint['checkpoint'])
+    opt = optim.Adam(model.meta_model.linear.parameters(), lr)
+
+    return model, opt
+
 def main(model, data_generators, device, lr=0.003, args=None):
-    opt = optim.Adam(model.getTaskParameters(), lr)
+    if args['use_load_model']:
+        model, opt = loadModel(model, args['load_model'], lr, device)
+    else:
+        opt = optim.Adam(model.getTaskParameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     results = {
@@ -81,7 +92,6 @@ def main(model, data_generators, device, lr=0.003, args=None):
         'val_loss': [],
         'test_acc': [],
         'test_loss': [],
-
     }
 
     for iteration in range(args['iterations']):        
@@ -89,7 +99,7 @@ def main(model, data_generators, device, lr=0.003, args=None):
         addResults(model, data_generators, results, iteration, train_error, train_accuracy, device)
 
     if args['save_model']:
-        name_file = '{}/{}_{}_{}'.format(base_path,str(time.time()),str(args['percentage_new_filter']), str(args['split_batch']), args['dataset'])
+        name_file = '{}/{}_{}_{}_{}'.format(base_path,str(time.time()),str(args['percentage_new_filter']), str(args['split_batch']), args['dataset'])
         saveValues(name_file, results, model, args)
         
 if __name__ == '__main__':
@@ -108,7 +118,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device).to(device)
+    model = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
     model.setLinear(0, 10)
     data_generators = getDataset(args.dataset)
 
