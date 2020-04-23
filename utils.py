@@ -35,6 +35,7 @@ def getArguments():
     parser.add_argument('--hidden-size', type=int, default=32)
     parser.add_argument('--percentage-new-filter', type=float, default=0.2)
     parser.add_argument('--split-batch', type=str2bool, default=False)
+    parser.add_argument('--train-task-parameters', type=str2bool, default=False)
 
 
     #--------------------------------Training-------------------------------------------#
@@ -171,6 +172,7 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None
     learner.train()
     running_loss = 0
     running_corrects = 0
+    params = {}
     for inputs, labels in data_loader:
         inputs = inputs.to(device)
         labels = labels.long().to(device)
@@ -187,6 +189,14 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None
 
         if ewc is not None:
             l += ewc.penalty(learner)
+
+        for i,p in enumerate(learner.parameters()):
+            if i not in params:
+                params[i] = p.sum()
+            
+            if params[i] - p.sum() != 0:
+                print(i)
+
 
         l.backward()
         optimizer.step()

@@ -5,6 +5,7 @@ import random
 import time
 
 import numpy as np
+from PIL import Image
 import torch
 from torch import nn
 from torch import optim
@@ -14,6 +15,7 @@ from torchvision.datasets import SVHN, CIFAR10
 
 from models.task_model import TaskModel
 from utils import saveValues, getArguments, train_normal, test_normal
+from method.ewc import EWC
 
 base_path = 'results'
 
@@ -21,7 +23,16 @@ def accuracy(predictions, targets):
     predictions = predictions.argmax(dim=1).view(targets.shape)
     return (predictions == targets).sum().float() / targets.size(0)
 
-def getDataset(name_dataset):
+def get_sample(dataset, sample_size):
+    sample_idx = random.sample(range(len(dataset)), sample_size)
+    temp = []
+    for img in dataset.data[sample_idx]:
+        if dataset.transform:
+            img = dataset.transform(Image.fromarray(img)).unsqueeze(0)
+        temp.append(img)
+    return temp
+
+def getDataset(name_dataset, ewc=False):
     generators = {}
     transform_data = transforms.Compose([
             transforms.Resize(84),
@@ -49,6 +60,10 @@ def getDataset(name_dataset):
 
     else:
         raise Exception('Dataset {} not supported'.format(name_dataset))
+
+    if ewc:
+        dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
+        generators['sample'] = get_sample(dataset_train,300)
 
     return generators
 
@@ -81,6 +96,14 @@ def loadModel(model, path_file, lr, device):
 def main(model, data_generators, device, lr=0.003, args=None):
     if args['use_load_model']:
         model, opt = loadModel(model, args['load_model'], lr, device)
+
+        ewc = None
+        if args['use_ewc']:
+            ewc = EWC(model, data_generators['sample'], args['ewc_importance'], model.getTaskParameters())
+        
+        if args['train_task_parameters'] or args['use_ewc']:
+            opt = optim.Adam(model.getTaskParameters(), lr)
+
     else:
         opt = optim.Adam(model.getTaskParameters(), lr)
     loss = nn.CrossEntropyLoss(reduction='mean')
@@ -95,7 +118,7 @@ def main(model, data_generators, device, lr=0.003, args=None):
     }
 
     for iteration in range(args['iterations']):        
-        train_error, train_accuracy = train_normal(data_generators['train'], model, loss, opt, [],device)
+        train_error, train_accuracy = train_normal(data_generators['train'], model, loss, opt, [],device, ewc)
         addResults(model, data_generators, results, iteration, train_error, train_accuracy, device)
 
     if args['save_model']:
@@ -120,7 +143,7 @@ if __name__ == '__main__':
     
     model = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
     model.setLinear(0, 10)
-    data_generators = getDataset(args.dataset)
+    data_generators = getDataset(args.dataset, args.use_ewc)
 
     #print(model)
     main(model,

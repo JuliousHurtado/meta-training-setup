@@ -9,23 +9,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #DataLoader.dataset.get_sample(args['sample_size'])
 
 class EWC(object):
-    def __init__(self, model: nn.Module, dataset: list, importance: float, freeze_layers: list):
+    def __init__(self, model: nn.Module, dataset: list, importance: float, get_params):
 
         self.model = model
         self.dataset = dataset
         self.importance = importance
-        self.freeze_layer = freeze_layers
-
-        if self.freeze_layer is None:
-            self.freeze_layer = []
+        self.get_params = get_params
 
         #self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad and (int(n[5]) not in self.freeze_layer) }
         self.params = {}
 
-        for n, p in self.model.named_parameters():
-            if n[5] == 'r':
-                continue
-            if p.requires_grad and (int(n[5]) not in self.freeze_layer):
+        for n, p in enumerate(self.get_params):
+            if p.requires_grad:
                 self.params[n] = p            
 
         self._means = {}
@@ -44,26 +39,20 @@ class EWC(object):
         for input in self.dataset:
             self.model.zero_grad()
             input = input.to(device)
-            output = self.model(input).view(1, -1)
+            output = self.model(input, None)[0].view(1, -1)
             label = output.max(1)[1].view(-1)
             loss = F.nll_loss(F.log_softmax(output, dim=1), label)
             loss.backward()
 
-            for n, p in self.model.named_parameters():
-                if n[5] == 'r':
-                    continue
-                if int(n[5]) not in self.freeze_layer:
-                    precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
+            for n, p in enumerate(self.get_params):
+                precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
 
         precision_matrices = {n: p for n, p in precision_matrices.items()}
         return precision_matrices
 
     def penalty(self, model: nn.Module):
         loss = 0
-        for n, p in model.named_parameters():
-            if n[5] == 'r':
-                continue
-            if int(n[5]) not in self.freeze_layer:
-                _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
-                loss += _loss.sum()
+        for n, p in enumerate(self.get_params):
+            _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
+            loss += _loss.sum()
         return loss * self.importance 
