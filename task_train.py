@@ -94,10 +94,10 @@ def loadModel(model, path_file, lr, device):
     return model, opt
 
 def main(model, data_generators, device, lr=0.003, args=None):
+    ewc = None
     if args['use_load_model']:
         model, opt = loadModel(model, args['load_model'], lr, device)
 
-        ewc = None
         if args['use_ewc']:
             ewc = EWC(model, data_generators['sample'], args['ewc_importance'], model.getTaskParameters())
         
