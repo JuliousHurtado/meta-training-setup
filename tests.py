@@ -8,77 +8,53 @@ import torch
 from torch import nn
 import torchvision
 from torchvision.datasets import ImageFolder, SVHN, CIFAR10
+from torchvision import transforms
 from torch.nn import functional as F
 
 import learn2learn as l2l
 
-from utils import getArguments, getAlgorithm, fast_adapt
-from models.l2l_models import MiniImagenetCNN, OmniglotCNN
+from models.task_model import TaskModel
+from utils import getArguments
+
+from models.l2l_models import MiniImagenetCNN
 
 base_path = 'results'
-
-def getModel(input_channels, ways = 5, device = 'cpu'):
-    if input_channels == 1:
-        return OmniglotCNN(ways).to(device)
-    elif input_channels == 3:
-        return MiniImagenetCNN(ways).to(device)
-    else:
-        raise Exception('Input Channels must be 1 or 3, not: {}'.format(input_channels))
 
 def test_normal(model, data_loader, device):
     #model.eval()
     correct = 0
     for input, target in data_loader:
         input, target = input.to(device), target.long().to(device)
-        o = model[0](input)
-        output = model[1].forwardHead(o)
+        o = model[0].forwardNoHead(input)
+        output = model[1].forwardOnlyHead(o)
         correct += (F.softmax(output, dim=1).max(dim=1)[1] == target).data.sum()
     return correct.item() / len(data_loader.dataset)
 
-def getDataset(name_dataset, ways, shots):
+def getDataset(name_dataset):
     generators = {}
-    transform_data = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(84),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    transform_data = transforms.Compose([
+            transforms.Resize(84),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
+    bs = 64
+    if name_dataset == 'SVHN':
+        dataset = SVHN('./data/', split='train', transform=transform_data, download=True)        
+        generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
-    if name_dataset == 'MiniImagenet':
-        train_dataset = None
-        for mode, num_tasks in zip(['train','validation','test'],[20000,600,600]):
-            dataset = l2l.data.MetaDataset(l2l.vision.datasets.MiniImagenet(root='./data', mode=mode))
-
-            if train_dataset is None:
-                train_dataset = dataset
-
-            transforms = [
-                    NWays(dataset, ways),
-                    KShots(dataset, 2*shots),
-                    LoadData(dataset),
-                    RemapLabels(dataset),
-                    ConsecutiveLabels(train_dataset),
-                ]
-
-            generators[mode] = l2l.data.TaskDataset(dataset,
-                                       task_transforms=transforms,
-                                       num_tasks=num_tasks)
-
-    elif name_dataset == 'SVHN':
         dataset = SVHN('./data/', split='train', transform=transform_data, download=True)
-        
-        generators['train'] = torch.utils.data.DataLoader(dataset, batch_size=64)
-        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['validation'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
         dataset = SVHN('./data/', split='test', transform=transform_data, download=True)
-        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=64)
+        generators['test'] = torch.utils.data.DataLoader(dataset, batch_size=bs)
 
     elif name_dataset == 'cifar10':
         dataset_train = CIFAR10('./data/', train=True, transform=transform_data, download=True)
         dataset_test = CIFAR10('./data/', train=False, transform=transform_data, download=True)
 
-        generators['train'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
-        generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=64)
-        generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=64)
+        generators['train'] = torch.utils.data.DataLoader(dataset_train, batch_size=bs)
+        generators['validation'] = torch.utils.data.DataLoader(dataset_train, batch_size=bs)
+        generators['test'] = torch.utils.data.DataLoader(dataset_test, batch_size=bs)
 
     else:
         raise Exception('Dataset {} not supported'.format(name_dataset))
@@ -86,36 +62,25 @@ def getDataset(name_dataset, ways, shots):
     return generators
 
 def loadModel(args, file_name, file_head, device):
-    model_body = getModel(args.input_channel, ways=args.init_ways, device=device)
-    model_head = getModel(args.input_channel, ways=args.ways, device=device)
+    model_body = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
+    model_body.setLinear(0, 10)
+    
+    model_head = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
+    model_head.setLinear(0, 10)
 
-    checkpoint = torch.load(os.path.join(base_path,file_name), map_location=device)
-    model_body.load_state_dict(checkpoint['checkpoint'])
+    checkpoint1 = torch.load(file_name, map_location=device)
+    model_body.load_state_dict(checkpoint1['checkpoint'])
 
-    checkpoint = torch.load(os.path.join(base_path,file_head), map_location=device)
-    model_head.load_state_dict(checkpoint['checkpoint'])
+    checkpoint2 = torch.load(file_head, map_location=device)
+    model_head.load_state_dict(checkpoint2['checkpoint'])
 
     return model_body, model_head
 
-def main(model, data_generators, ways, shots, device, adaptation_steps, args, fine_tuning):
+def main(model, data_generators, device, args):
     loss = nn.CrossEntropyLoss(reduction='mean')
 
     tests = []
-    if fine_tuning:
-        tests.append(test_normal(model, data_generators['test'], device))
-    else:
-        for iteration in range(100):
-            learner = model.clone()
-            batch = data_generators['test'].sample()
-            evaluation_error, evaluation_accuracy = fast_adapt(batch,
-                                                                   learner,
-                                                                   [],
-                                                                   loss,
-                                                                   adaptation_steps,
-                                                                   shots,
-                                                                   ways,
-                                                                   device)
-            tests.append(evaluation_accuracy)
+    tests.append(test_normal(model, data_generators['test'], device))
 
     print(args)
     print(np.mean(tests))
@@ -124,10 +89,6 @@ def main(model, data_generators, ways, shots, device, adaptation_steps, args, fi
 if __name__ == '__main__':
     parser = getArguments()
     args = parser.parse_args()
-
-    fine_tuning = False
-    if args.algorithm == 'FT':
-        fine_tuning = True
 
     use_cuda = torch.cuda.is_available()
 
@@ -141,16 +102,10 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    models = loadModel(args, args.load_model, args.load_head, device)
-    meta_model = getAlgorithm(args.algorithm, models, args.fast_lr, args.first_order, args.freeze_layer)
-    
-    data_generators = getDataset(args.dataset, args.ways, args.shots)
+    model = loadModel(args, args.load_model, args.load_head, device)
+    data_generators = getDataset(args.dataset)
 
-    main(meta_model,
+    main(model,
          data_generators,
-         ways=args.ways,
-         shots=args.shots,
          device=device,
-         adaptation_steps=args.fast_adaption_steps,
-         args=vars(parser.parse_args()),
-         fine_tuning=fine_tuning)
+         args=vars(parser.parse_args()))

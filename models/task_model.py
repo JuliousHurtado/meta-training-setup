@@ -170,4 +170,35 @@ class TaskModel(nn.Module):
 
         out = self.meta_model.linear(x2.view(-1, 25 * 32))
         return out, y2
-        
+
+    def forwardNoHead(self, x):
+        x1 = x[:]
+        x2 = x[:]
+        f = self.task_model(x1)
+        for i, elem in enumerate(self.meta_model.base):
+            if self.p_filter == 0.0:
+                x2 = F.conv2d(x2, elem.conv.weight, None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            elif self.p_filter == 1.0:
+                x2 = F.conv2d(x2, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+            else:
+                x_1 = F.conv2d(x2, elem.conv.weight[self.task_model.filters[i]['no_index']], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x_2 = F.conv2d(x2, f[i], None, elem.conv.stride, elem.conv.padding, elem.conv.dilation, elem.conv.groups)
+                x2 = torch.cat([x_1,x_2], dim=1)
+            
+            x2 = elem.normalize(x2)
+            x2 = elem.relu(x2)
+            x2 = elem.max_pool(x2)
+
+        return x2
+
+    def forwardOnlyHead(self, x):
+        if self.training and self.split_batch:
+            p = int(x.size(0)/2)
+            x1 = x[:p]
+            x2 = x[p:]
+        else:
+            x1 = x[:]
+            x2 = x[:]
+
+        out = self.meta_model.linear(x.view(-1, 25*32))
+        return out

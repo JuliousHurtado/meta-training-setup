@@ -190,12 +190,12 @@ def train_normal(data_loader, learner, loss, optimizer, regs, device, ewc = None
         if ewc is not None:
             l += ewc.penalty(learner)
 
-        for i,p in enumerate(learner.parameters()):
-            if i not in params:
-                params[i] = p.sum()
+        # for i,p in enumerate(learner.parameters()):
+        #     if i not in params:
+        #         params[i] = p.sum()
             
-            if params[i] - p.sum() != 0:
-                print(i)
+        #     if params[i] - p.sum() != 0:
+        #         print(i)
 
 
         l.backward()
