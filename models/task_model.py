@@ -127,13 +127,14 @@ class TaskModel(nn.Module):
     #                 print(p.weight[self.task_model.filters[count]['index']].grad)
     #                 count += 1
 
-    def getTaskParameters(self):
+    def getTaskParameters(self, linear=True):
         params = []
         for p in self.task_model.mlp.parameters():
             params.append(p)
 
-        for p in self.meta_model.linear.parameters():
-            params.append(p)
+        if linear:
+            for p in self.meta_model.linear.parameters():
+                params.append(p)
 
         return params
 
