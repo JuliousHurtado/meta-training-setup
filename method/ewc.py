@@ -40,7 +40,7 @@ class EWC(object):
                     if p.grad is not None:
                         precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
                     else:
-                        precision_matrices[n].data = torch.Tensor([0])
+                        precision_matrices[n].data = torch.Tensor([0]).to(device)
 
         precision_matrices = {n: p for n, p in precision_matrices.items()}
         return precision_matrices
