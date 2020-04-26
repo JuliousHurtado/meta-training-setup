@@ -116,7 +116,7 @@ def main(model, data_generators, device, lr=0.003, args=None):
 
     for iteration in range(args['iterations']):   
         if args['use_ewc']:
-            ewc = EWC(model, data_generators['sample'], args['ewc_importance'], model.getTaskParameters(False))     
+            ewc = EWC(model, data_generators['sample'], args['ewc_importance'])     
         
         train_error, train_accuracy = train_normal(data_generators['train'], model, loss, opt, [],device, ewc)
         addResults(model, data_generators, results, iteration, train_error, train_accuracy, device)

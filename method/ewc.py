@@ -30,13 +30,17 @@ class EWC(object):
         for input in self.dataset:
             self.model.zero_grad()
             input = input.to(device)
-            output = self.model(input, None).view(1, -1)
+            output = self.model(input, None)[0].view(1, -1)
             label = output.max(1)[1].view(-1)
             loss = F.nll_loss(F.log_softmax(output, dim=1), label)
             loss.backward()
 
             for n, p in self.model.named_parameters():
-                precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
+                if p.requires_grad:
+                    if p.grad is not None:
+                        precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
+                    else:
+                        precision_matrices[n].data = torch.Tensor([0])
 
         precision_matrices = {n: p for n, p in precision_matrices.items()}
         return precision_matrices
@@ -44,6 +48,7 @@ class EWC(object):
     def penalty(self, model: nn.Module):
         loss = 0
         for n, p in model.named_parameters():
-            _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
-            loss += _loss.sum()
+            if p.requires_grad:
+                _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
+                loss += _loss.sum()
         return loss * self.importance
