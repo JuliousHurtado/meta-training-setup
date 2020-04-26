@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    model = TaskModel(os.path.join(args.load_model), args.percentage_new_filter, args.split_batch, device, args.use_load_model).to(device)
+    model = TaskModel(os.path.join(args.load_model), args.percentage_new_filter, args.split_batch, device, args.load_meta_model).to(device)
     model.setLinear(0, 10)
     data_generators = getDataset(args.dataset, args.use_ewc)
 

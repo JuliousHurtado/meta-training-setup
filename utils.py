@@ -58,6 +58,7 @@ def getArguments():
     parser.add_argument('--use-load-model', type=str2bool, default=False)
     parser.add_argument('--load-model', type=str, default='./results/temp.pth')
     parser.add_argument('--load-head', type=str, default='')
+    parser.add_argument('--load-meta-model', type=str2bool, default=False)
 
 
     #---------------------------------Regularization-------------------------------------#
