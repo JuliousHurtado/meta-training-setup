@@ -6,23 +6,14 @@ from torch.nn import functional as F
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-#DataLoader.dataset.get_sample(args['sample_size'])
-
 class EWC(object):
-    def __init__(self, model: nn.Module, dataset: list, importance: float, get_params):
+    def __init__(self, model: nn.Module, dataset: list, importance: float):
 
         self.model = model
         self.dataset = dataset
         self.importance = importance
-        self.get_params = get_params
 
-        #self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad and (int(n[5]) not in self.freeze_layer) }
-        self.params = {}
-
-        for n, p in enumerate(self.get_params):
-            if p.requires_grad:
-                self.params[n] = p            
-
+        self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad}
         self._means = {}
         self._precision_matrices = self._diag_fisher()
 
@@ -39,12 +30,12 @@ class EWC(object):
         for input in self.dataset:
             self.model.zero_grad()
             input = input.to(device)
-            output = self.model(input, None)[0].view(1, -1)
+            output = self.model(input, None).view(1, -1)
             label = output.max(1)[1].view(-1)
             loss = F.nll_loss(F.log_softmax(output, dim=1), label)
             loss.backward()
 
-            for n, p in enumerate(self.get_params):
+            for n, p in self.model.named_parameters():
                 precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
 
         precision_matrices = {n: p for n, p in precision_matrices.items()}
@@ -52,7 +43,7 @@ class EWC(object):
 
     def penalty(self, model: nn.Module):
         loss = 0
-        for n, p in enumerate(self.get_params):
+        for n, p in model.named_parameters():
             _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
             loss += _loss.sum()
-        return loss * self.importance 
+        return loss * self.importance
