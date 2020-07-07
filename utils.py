@@ -37,13 +37,9 @@ def getArguments():
     #--------------------------------Model----------------------------------------------#
     parser.add_argument('--hidden-size', type=int, default=32)
     parser.add_argument('--layers', type=int, default=4)
-    parser.add_argument('--percentage-new-filter', type=float, default=0.2)
-    parser.add_argument('--split-batch', type=str2bool, default=False)
-    parser.add_argument('--train-task-parameters', type=str2bool, default=False)
 
 
     #--------------------------------Training-------------------------------------------#
-    parser.add_argument('--iterations', type=int, default=80)
     parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--dataset', type=str, default='multi', metavar='C',
                         help='[multi]')
@@ -54,7 +50,7 @@ def getArguments():
 
     #--------------------------------Extra----------------------------------------------#
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--save-model', type=str2bool, default=True)
+    parser.add_argument('--save-model', type=str2bool, default=False)
     parser.add_argument('--use-load-model', type=str2bool, default=False)
     parser.add_argument('--load-model', type=str, default='./results/temp.pth')
 
