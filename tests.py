@@ -21,7 +21,8 @@ from models.l2l_models import MiniImagenetCNN
 base_path = 'results'
 
 def test_normal(model, data_loader, device):
-    #model.eval()
+    model[0].eval()
+    model[1].eval()
     correct = 0
     for input, target in data_loader:
         input, target = input.to(device), target.long().to(device)
@@ -62,14 +63,16 @@ def getDataset(name_dataset):
     return generators
 
 def loadModel(args, file_name, file_head, device):
-    model_body = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
+    model_body = TaskModel(os.path.join('./results', args.path_meta_model), args.percentage_new_filter, args.split_batch, device, False).to(device)
     model_body.setLinear(0, 10)
     
-    model_head = TaskModel(os.path.join('./results', args.load_model), args.percentage_new_filter, args.split_batch, device, not args.use_load_model).to(device)
+    model_head = TaskModel(os.path.join('./results', args.path_meta_model), args.percentage_new_filter, args.split_batch, device, False).to(device)
     model_head.setLinear(0, 10)
 
     checkpoint1 = torch.load(file_name, map_location=device)
     model_body.load_state_dict(checkpoint1['checkpoint'])
+
+    model_body.task_model.filters = model_body.getFilterZero()
 
     checkpoint2 = torch.load(file_head, map_location=device)
     model_head.load_state_dict(checkpoint2['checkpoint'])
