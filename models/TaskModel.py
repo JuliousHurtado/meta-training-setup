@@ -72,11 +72,11 @@ class ConvBase(nn.Sequential):
         super(ConvBase, self).__init__(*core)
 
 class MiniImagenetCNN(nn.Module):
-    def __init__(self, hidden_size=32, layers=4):
+    def __init__(self, hidden_size=32, layers=4, channels=3):
         super(MiniImagenetCNN, self).__init__()
         self.base = ConvBase(output_size=hidden_size,
                              hidden=hidden_size,
-                             channels=3,
+                             channels=channels,
                              max_pool=True,
                              layers=layers,
                              max_pool_factor=4 // layers)
