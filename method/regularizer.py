@@ -46,8 +46,8 @@ class FilterReg(nn.Module):
 
             temp = temp.norm(2,1)
             loss_reg += temp.sum()
-            if layer.conv.bias is not None:
-                loss_reg += layer.conv.bias.norm(1)
+            if param.bias is not None:
+                loss_reg += param.bias.norm(1)
 
         return loss_reg*self.c_theta
 
