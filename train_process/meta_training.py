@@ -25,9 +25,8 @@ def fast_adapt(batch, learner, regs, loss, adaptation_steps, shots, ways, device
     predictions = learner(evaluation_data)
     valid_error = loss(predictions, evaluation_labels)
 
-    if len(regs) > 0:
-        for reg in regs:
-            valid_error += reg(learner)
+    if regs:
+        valid_error += regs(learner)
 
     valid_error /= len(evaluation_data)
     valid_accuracy = accuracy(predictions, evaluation_labels)

@@ -64,7 +64,7 @@ class DatasetGen(object):
         self.pc_valid = 0.15
         self.root = './data'
 
-        self.num_task = 5
+        self.num_task = args.num_tasks
         self.num_samples = 0
 
         self.inputsize = [3,32,32]
@@ -72,7 +72,10 @@ class DatasetGen(object):
         self.num_workers = 4
         self.pin_memory = True
 
-        self.datasets_idx = list(np.random.permutation(self.num_task))
+        #self.datasets_idx = list(np.random.permutation(self.num_task))
+        self.datasets_idx = [1, 4, 2, 0, 3]
+        self.datasets_idx = self.datasets_idx[:self.num_task]
+        
         print('Task order =', [list(classes_datasets.keys())[item] for item in self.datasets_idx])
         self.datasets_names = [list(classes_datasets.keys())[item] for item in self.datasets_idx]
 
@@ -94,10 +97,6 @@ class DatasetGen(object):
             self.dataloaders[i] = {}
 
         self.download = True
-
-        self.train_set = {}
-        self.test_set = {}
-        self.train_split = {}
 
     def get_dataset(self, dataset_idx, task_num, num_samples_per_class=False, normalize=True):
         dataset_name = list(mean_datasets.keys())[dataset_idx]
@@ -156,11 +155,13 @@ class DatasetGen(object):
         split = int(np.floor(self.pc_valid * len(self.train_set[task_id])))
         train_split, valid_split = torch.utils.data.random_split(self.train_set[task_id], [len(self.train_set[task_id]) - split, split])
 
-        if True:
+        if self.args.meta_train:
             meta_dataset = copy.deepcopy(self.train_set[task_id])
-            meta_loader = self.get_meta_loader(meta_dataset, current_dataset_idx)
+            meta_loader = self.get_meta_loader(meta_dataset, task_id)
 
             self.dataloaders[task_id]['meta'] = meta_loader
+        else:
+            self.dataloaders[task_id]['meta'] = None
 
         train_loader = torch.utils.data.DataLoader(train_split, batch_size=self.batch_size, num_workers=self.num_workers,
                                                    pin_memory=self.pin_memory,shuffle=True)

@@ -22,8 +22,8 @@ def trainingProcessTask(data_loader, learner, optimizer, regs, device):
         _, preds = torch.max(out, 1)
         l = loss(out, labels)
 
-        if regs and regs['reg']:
-            l += regs['reg'](learner)
+        if regs:
+            l += regs(learner)
         
         l.backward()
         optimizer.step()    

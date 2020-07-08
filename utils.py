@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from models.TaskModel import TaskManager
 
 from method.maml import MAML
-from method.regularizer import FilterReg, LinearReg, FilterSparseReg
+from method.regularizer import FilterReg, Lnorm
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
@@ -32,6 +32,7 @@ def getArguments():
     parser.add_argument('--meta-batch-size', type=int, default=16)
     parser.add_argument('--adaptation-steps', type=int, default=5)
     parser.add_argument('--meta-train', type=str2bool, default=False)
+    parser.add_argument('--task-with-meta', type=int, default=-1)
 
 
     #--------------------------------Model----------------------------------------------#
@@ -43,10 +44,12 @@ def getArguments():
     parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--dataset', type=str, default='multi', metavar='C',
                         help='[multi, pmnist]')
+    parser.add_argument('--num-tasks', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
-
+    parser.add_argument('--only-linear', type=str2bool, default=False)
+    parser.add_argument('--task-linear', type=int, default=-1)
 
     #--------------------------------Extra----------------------------------------------#
     parser.add_argument('--seed', type=int, default=42)
@@ -56,11 +59,9 @@ def getArguments():
 
 
     #---------------------------------Regularization-------------------------------------#
-    parser.add_argument('--filter-reg', type=str2bool, default=False)
-    parser.add_argument('--sparse-reg', type=str2bool, default=False)
-    parser.add_argument('--cost-theta', type=float, default=0.01)
-    parser.add_argument('--linear-reg', type=str2bool, default=False)
-    parser.add_argument('--cost-omega', type=float, default=0.01)
+    parser.add_argument('--cost-theta', type=float, default=0.001)
+    parser.add_argument('--regularization',default='', type=str, required=False,
+                        choices=['','1','2','1,2'])
 
 
     return parser
@@ -78,14 +79,14 @@ def getModel(cls_per_task, hidden_size=32, layers=4,device='cpu', channels=3):
 def getMetaAlgorithm(model, fast_lr, first_order):
     return MAML(model, lr=fast_lr, first_order=first_order)
 
-def getRegularizer(convFilter, c_theta, linearReg, c_omega, sparseFilter):
-    regularizator = []
+def getRegularizer(norm, c_theta):
+    regularizator = None
 
-    if convFilter:
-        regularizator.append(FilterReg(c_theta))
-    if linearReg:
-        regularizator.append(LinearReg(c_omega))
-    if sparseFilter:
-        regularizator.append(FilterSparseReg(c_theta))
+    if norm == '1':
+        regularizator = Lnorm(c_theta,1)
+    elif norm == '2':
+        regularizator = Lnorm(c_theta,2)
+    elif norm == '1,2':
+        regularizator = FilterReg(c_theta)
 
     return regularizator
