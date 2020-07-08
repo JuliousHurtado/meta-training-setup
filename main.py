@@ -9,9 +9,10 @@ from torch import optim
 from utils import getArguments, getModel, saveValues, getRegularizer, getMetaAlgorithm
 
 from train_process.meta_training import trainingProcessMeta
-from train_process.task_training import trainingProcessTask
+from train_process.task_training import trainingProcessTask, test_normal
 
 from dataloader.multi_dataset import DatasetGen as multi_cls
+from dataset.pmnist import DatasetGen as pmnist
 
 def adjustModelTask(model, task, lr, num_cls):
     model.setLinearLayer(task, num_cls)
@@ -65,10 +66,12 @@ def main(args, data_generators, model, device):
             test_acc = test_normal(model, task_dataloader[i]['test'], device)
             results[i]['test_acc'].append(test_acc)   
 
+        results[i]['final_acc'].append(test_acc) 
+
         for j in range(i):
             model.setLinearLayer(j, -1)
             test_acc = test_normal(model, task_dataloader[j]['test'], device)
-            results[j]['final'].append(test_acc)  
+            results[j]['final_acc'].append(test_acc)  
             
         if args.save_model:
             results[i]['parameters'] = model.state_dict()
@@ -98,6 +101,10 @@ if __name__ == '__main__':
     if args.dataset == 'multi':
         data_generators = multi_cls(args)
         args.dataset_order = data_generators.datasets_names
+        channels = 3
+    elif args.dataset == 'pmnist':
+        data_generators = pmnist(args)
+        channels = 1
 
     cls_per_task = data_generators.taskcla
 

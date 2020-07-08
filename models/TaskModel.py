@@ -95,7 +95,7 @@ class MiniImagenetCNN(nn.Module):
 
 
 class TaskManager(nn.Module):
-    def __init__(self, output_size, hidden_size=32, layers=4, device = 'cpu'):
+    def __init__(self, output_size, channels=3, hidden_size=32, layers=4, device = 'cpu'):
         super(TaskManager, self).__init__()
 
         self.task = []
@@ -103,7 +103,7 @@ class TaskManager(nn.Module):
         maml_init_(linear_layer)
         self.task.append(linear_layer)
 
-        self.model = MiniImagenetCNN(hidden_size=hidden_size, layers=layers)
+        self.model = MiniImagenetCNN(hidden_size=hidden_size, channels=channels, layers=layers)
 
         self.setLinearLayer(0, output_size)
 

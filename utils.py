@@ -42,7 +42,7 @@ def getArguments():
     #--------------------------------Training-------------------------------------------#
     parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--dataset', type=str, default='multi', metavar='C',
-                        help='[multi]')
+                        help='[multi, pmnist]')
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
@@ -72,8 +72,8 @@ def saveValues(name_file, results, model, args):
             'checkpoint': model.state_dict()
             }, name_file)
 
-def getModel(cls_per_task, hidden_size=32, layers=4,device='cpu'):
-    return TaskManager(cls_per_task, hidden_size, layers, device).to(device)
+def getModel(cls_per_task, hidden_size=32, layers=4,device='cpu', channels=3):
+    return TaskManager(cls_per_task, channels, hidden_size, layers, device).to(device)
 
 def getMetaAlgorithm(model, fast_lr, first_order):
     return MAML(model, lr=fast_lr, first_order=first_order)
