@@ -102,3 +102,11 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+
+#Extras
+old/*
+Adversarial-Continual-Learning/*
+data/*
+results/*
+server/*
