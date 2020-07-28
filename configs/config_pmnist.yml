@@ -5,6 +5,7 @@
 
 num_runs: 1
 experiment: "pmnist"
+experiment_name: "pmnist"
 data_dir: "../data"
 checkpoint: "./checkpoints/"
 

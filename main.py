@@ -93,7 +93,7 @@ def main(args):
     accuracies, forgetting, results = [], [], []
     for n in range(args.num_runs):
         args.seed += n 
-        args.output = 'results/{}_{}_tasks_seed_{}.pth'.format(args.experiment, args.ntasks, args.seed)
+        args.output = 'results/{}_{}_tasks_seed_{}.pth'.format(args.experiment_name, args.ntasks, args.seed)
         print ("args.output: ", args.output)
         
         print (" >>>> Run #", n)

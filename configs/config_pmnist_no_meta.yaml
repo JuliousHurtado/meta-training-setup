@@ -4,7 +4,8 @@
 # LICENSE file in the root directory of this source tree.
 
 num_runs: 1
-experiment: "pmnist_no_meta"
+experiment: "pmnist"
+experiment_name: "pmnist_no_meta"
 data_dir: "../data"
 checkpoint: "./checkpoints/"
 
@@ -22,7 +23,7 @@ inner_loop: 1
 head_units: 28
 latent_dim: 64
 
-batch_size: 128
+batch_size: 256
 pc_valid: 0.15
 val_iter: 10
 
