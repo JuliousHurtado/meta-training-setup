@@ -1,0 +1,30 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+num_runs: 1
+experiment: "mnist5"
+data_dir: "./data"
+checkpoint: "./checkpoints/"
+
+n_channels: 1
+ntasks: 5
+
+lr_out: 0.001
+lr_inner: 0.01
+
+out_epochs: 10
+pri_epochs: 5
+mini_tasks: 5
+inner_loop: 5
+
+head_units: 28
+latent_dim: 64
+
+batch_size: 32
+pc_valid: 0.15
+val_iter: 10
+
+workers: 4
+seed: 48
