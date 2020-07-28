@@ -18,29 +18,30 @@ def getOptimizer(shared, net, lr, task_id):
         for p in net.shared.parameters():
             params.append(p)
 
-    return optim.SGD(params, lr)
+    return optim.SGD(params, lr, weight_decay=0.01)
 
 def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
     net.train()
-    correct, loss = 0.0, 0.0
-    total = 0
-    for i, batch in enumerate(dataloader):
-        opti.zero_grad()
-        inputs = batch[0].to(device)
-        labels = batch[1].to(device)
+    for e in range(epochs):
+        correct, loss = 0.0, 0.0
+        total = 0
+        for i, batch in enumerate(dataloader):
+            opti.zero_grad()
+            inputs = batch[0].to(device)
+            labels = batch[1].to(device)
 
-        outs = net(inputs.clone(), inputs.clone(), task_id)
-        _, preds = outs.max(1)
+            outs = net(inputs.clone(), inputs.clone(), task_id)
+            _, preds = outs.max(1)
 
-        l = criterion(outs, labels) 
-        l.backward()
+            l = criterion(outs, labels) 
+            l.backward()
 
-        opti.step()
+            opti.step()
 
-        correct += preds.eq(labels.view_as(preds)).sum().item()
-        loss += l.item()
+            correct += preds.eq(labels.view_as(preds)).sum().item()
+            loss += l.item()
 
-        total += inputs.size(0)
+            total += inputs.size(0)
 
     return correct/total, loss/len(dataloader)
 
@@ -132,6 +133,33 @@ def train(args, net, task_id, dataloader, criterion, device):
     results['val_loss'].append(res[1])
     results['val_acc'].append(res[0])
 
+    return results
+
+def trainAll(args, net, task_id, dataloader, criterion, device):
+    net.train()
+    opti_total = getOptimizer(True, net, args.lr_out, task_id)
+
+    results = {
+        'meta_loss': [],
+        'mini_loss': [],
+        'val_loss': [],
+        'val_acc': [],
+        'train_loss': [],
+        'train_acc': []
+    }
+    for i in range(args.out_epochs):
+        res = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device)
+        results['train_loss'].append(res[1])
+        results['train_acc'].append(res[0])
+
+        print("Train: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+
+        res = test(net, task_id, dataloader['valid'], criterion, device)
+        results['val_loss'].append(res[1])
+        results['val_acc'].append(res[0])
+
+        print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+        
     return results
 
 def test(net, task_id, dataloader, criterion, device):
