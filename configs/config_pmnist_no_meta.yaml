@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 num_runs: 1
-experiment: "pmnist"
+experiment: "pmnist_no_meta"
 data_dir: "../data"
 checkpoint: "./checkpoints/"
 
@@ -14,15 +14,15 @@ n_channels: 1
 lr_out: 0.01
 lr_inner: 0.1
 
-out_epochs: 40
-pri_epochs: 5
-mini_tasks: 15
+out_epochs: 80
+pri_epochs: 1
+mini_tasks: 0
 inner_loop: 1
 
 head_units: 28
 latent_dim: 64
 
-batch_size: 256
+batch_size: 128
 pc_valid: 0.15
 val_iter: 10
 

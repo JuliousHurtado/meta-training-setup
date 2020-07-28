@@ -55,6 +55,7 @@ def run(args, run_id):
     acc=np.zeros((len(args.taskcla),len(args.taskcla)),dtype=np.float32)
     lss=np.zeros((len(args.taskcla),len(args.taskcla)),dtype=np.float32)
 
+    total_res = {}
     for t,ncla in args.taskcla:
         print('*'*150)
         dataset = dataloader.get(t)
@@ -62,7 +63,8 @@ def run(args, run_id):
         print('*'*150)
 
         # Train
-        train(args, net, t, dataset[t], criterion, device)
+        res_task = train(args, net, t, dataset[t], criterion, device)
+        total_res[t] = res_task
         print('-'*150)
         print()
 
@@ -78,7 +80,7 @@ def run(args, run_id):
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
 
-    return avg_acc, gem_bwt
+    return avg_acc, gem_bwt, total_res
 
 def main(args):
     print('=' * 100)
@@ -88,16 +90,17 @@ def main(args):
     print('=' * 100)
 
     tstart=time.time()
-    accuracies, forgetting = [], []
+    accuracies, forgetting, results = [], [], []
     for n in range(args.num_runs):
         args.seed += n 
-        args.output = '{}_{}_tasks_seed_{}.txt'.format(args.experiment, args.ntasks, args.seed)
+        args.output = 'results/{}_{}_tasks_seed_{}.pth'.format(args.experiment, args.ntasks, args.seed)
         print ("args.output: ", args.output)
         
         print (" >>>> Run #", n)
-        acc, bwt = run(args, n)
+        acc, bwt, total_res = run(args, n)
         accuracies.append(acc)
         forgetting.append(bwt)
+        results.append(total_res)
 
     print('*' * 100)
     print ("Average over {} runs: ".format(args.num_runs))
@@ -107,6 +110,13 @@ def main(args):
     print ("All Done! ")
     print('[Elapsed time = {:.1f} min]'.format((time.time()-tstart)/(60)))
     utils.print_time()
+
+    torch.save({
+            'results': results,
+            'acc': accuracies,
+            'bwt': bwt,
+            'args': args,
+            }, args.output)
 
 
 if __name__ == '__main__':

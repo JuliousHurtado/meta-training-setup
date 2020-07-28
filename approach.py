@@ -75,6 +75,14 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_g
 def train(args, net, task_id, dataloader, criterion, device):
     opti_total = getOptimizer(True, net, args.lr_out, task_id)
 
+    results = {
+        'meta_loss': [],
+        'mini_loss': [],
+        'val_loss': [],
+        'val_acc': [],
+        'train_loss': [],
+        'train_acc': []
+    }
     for i in range(args.out_epochs):
         save_grads = {}
         loss_mini_task = 0.0
@@ -92,6 +100,8 @@ def train(args, net, task_id, dataloader, criterion, device):
 
         if args.mini_tasks > 0:
             print("Train: Total loss: {} \t Mini Task Loss: {}".format(total_loss/args.mini_tasks,loss_mini_task/args.mini_tasks))
+            results['meta_loss'].append(total_loss/args.mini_tasks)
+            results['mini_loss'].append(loss_mini_task/args.mini_tasks)
 
         for n, p in net.named_parameters():
             if n in save_grads and save_grads[n] is not None:   
@@ -104,15 +114,25 @@ def train(args, net, task_id, dataloader, criterion, device):
         if i % args.val_iter == 0:
             opti_priv = getOptimizer(False, net, args.lr_inner, task_id)
             res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+            results['train_loss'].append(res[1])
+            results['train_acc'].append(res[0])
 
             res = test(net, task_id, dataloader['valid'], criterion, device)
             print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+            results['val_loss'].append(res[1])
+            results['val_acc'].append(res[0])
 
     opti_priv = getOptimizer(False, net, args.lr_inner, task_id)
     res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
-    
+    results['train_loss'].append(res[1])
+    results['train_acc'].append(res[0])
+
     res = test(net, task_id, dataloader['valid'], criterion, device)
     print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+    results['val_loss'].append(res[1])
+    results['val_acc'].append(res[0])
+
+    return results
 
 def test(net, task_id, dataloader, criterion, device):
     net.eval()
