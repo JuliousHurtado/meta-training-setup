@@ -9,7 +9,6 @@ experiment_name: "cifar100"
 data_dir: "../data"
 checkpoint: "./checkpoints/"
 
-
 ntasks: 20
 n_channels: 3
 
@@ -27,6 +26,11 @@ latent_dim: 128
 batch_size: 128
 pc_valid: 0.15
 val_iter: 10
+
+lr_factor: 3
+lr_min: 1.0e-06
+lr_patience: 5
+mom: 0.9
 
 train_first: True
 
