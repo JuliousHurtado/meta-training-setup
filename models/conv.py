@@ -87,6 +87,7 @@ class Private(torch.nn.Module):
             for j in range(self.layers):
                 layer = torch.nn.Sequential()
                 layer.add_module('conv{}'.format(j+1),torch.nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
+                layer.add_module('bn{}'.format(j+1), torch.nn.BatchNorm2d(hiddens[j+1]))
                 layer.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
                 layer.add_module('maxpool{}'.format(j+1), torch.nn.MaxPool2d(2))
                 conv.append(layer)

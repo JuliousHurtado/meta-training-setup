@@ -18,7 +18,7 @@ def getOptimizer(shared, net, lr, task_id):
         for p in net.shared.parameters():
             params.append(p)
 
-    return optim.SGD(params, lr, weight_decay=0.01)
+    return optim.SGD(params, lr, weight_decay=0.01, momentum=0.9)
 
 def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
     net.train()
@@ -93,10 +93,20 @@ def train(args, net, task_id, dataloader, criterion, device):
             t_net = copy.deepcopy(net)
             opti_priv = getOptimizer(False, t_net, args.lr_inner, task_id)
 
-            batch = next(iter_data)
+            try:
+                batch = next(iter_data)
+            except:
+                iter_data = iter(dataloader['train'])
+                batch = next(iter_data)
+
             loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device) 
             
-            batch = next(iter_data)
+            try:
+                batch = next(iter_data)
+            except:
+                iter_data = iter(dataloader['train'])
+                batch = next(iter_data)
+                
             total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, save_grads) 
 
         if args.mini_tasks > 0:
@@ -159,7 +169,7 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         results['val_acc'].append(res[0])
 
         print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
-        
+
     return results
 
 def test(net, task_id, dataloader, criterion, device):
