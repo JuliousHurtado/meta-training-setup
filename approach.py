@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 
 import torch
 from torch import optim
@@ -75,6 +76,11 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_g
 
 def train(args, net, task_id, dataloader, criterion, device):
     opti_total = getOptimizer(True, net, args.lr_out, task_id)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
+                    factor=0.1, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
+
+    best_loss = np.inf
+    best_model = copy.deepcopy(net)
 
     results = {
         'meta_loss': [],
@@ -106,7 +112,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             except:
                 iter_data = iter(dataloader['train'])
                 batch = next(iter_data)
-                
+
             total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, save_grads) 
 
         if args.mini_tasks > 0:
@@ -133,6 +139,13 @@ def train(args, net, task_id, dataloader, criterion, device):
             results['val_loss'].append(res[1])
             results['val_acc'].append(res[0])
 
+            if res[1] < best_loss:
+                best_loss = res[1]
+                best_model = copy.deepcopy(net)
+
+            scheduler.step(res[1])
+            net.load_state_dict(copy.deepcopy(best_model).state_dict())
+
     opti_priv = getOptimizer(False, net, args.lr_inner, task_id)
     res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
     results['train_loss'].append(res[1])
@@ -143,11 +156,22 @@ def train(args, net, task_id, dataloader, criterion, device):
     results['val_loss'].append(res[1])
     results['val_acc'].append(res[0])
 
+    if res[1] < best_loss:
+        best_model = copy.deepcopy(net)
+
+    net.load_state_dict(copy.deepcopy(best_model).state_dict())
+
     return results
 
 def trainAll(args, net, task_id, dataloader, criterion, device):
     net.train()
     opti_total = getOptimizer(True, net, args.lr_out, task_id)
+
+    best_loss = np.inf
+    best_model = copy.deepcopy(net)
+
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
+                    factor=0.1, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
     results = {
         'meta_loss': [],
@@ -169,6 +193,13 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         results['val_acc'].append(res[0])
 
         print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+
+        if res[1] < best_loss:
+            best_loss = res[1]
+            best_model = copy.deepcopy(net)
+
+        scheduler.step(res[1])
+        net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
     return results
 

@@ -27,5 +27,10 @@ batch_size: 256
 pc_valid: 0.15
 val_iter: 10
 
+lr_factor: 3
+lr_min: 1.0e-06
+lr_patience: 5
+mom: 0.9
+
 workers: 4
 seed: 48
