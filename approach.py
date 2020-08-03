@@ -46,11 +46,15 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
 
     return correct/total, loss/len(dataloader)
 
-def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_grad=None):
+def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patience_inner, save_grad=None):
     running_loss = 0.0
+    best_loss = np.inf
+    best_model = copy.deepcopy(net)
+    patience = patience_inner
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
+    # print("New batch")
     for _ in range(inner_loop):
         outs = net(inputs.clone(), inputs.clone(), task_id)
         _, preds = torch.max(outs, 1)
@@ -60,17 +64,29 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_g
 
         if type(save_grad) == dict:
             for name, param in net.named_parameters():
-                if name not in save_grad and param.grad is not None:
-                    save_grad[name] = param.grad
                 if param.grad is not None:
-                    save_grad[name] += param.grad
+                    if name not in save_grad:
+                        save_grad[name] = param.grad
+                    else:
+                        save_grad[name] += param.grad
         else:
             opti.step()
             opti.zero_grad()
 
-        # print(l.item())
+            # print(l.item())
         running_loss += l.item()
-        running_corrects = preds.eq(labels.view_as(preds)).sum().item()
+
+        if l.item() < best_loss:
+            best_loss = l.item()
+            best_model = copy.deepcopy(net)
+        else:
+            patience -= 1
+            if patience <= 0:
+                net.load_state_dict(copy.deepcopy(best_model).state_dict())
+                break
+        net.load_state_dict(copy.deepcopy(best_model).state_dict())
+            
+        #running_corrects = preds.eq(labels.view_as(preds)).sum().item()
 
     return running_loss/inner_loop
 
@@ -105,7 +121,7 @@ def train(args, net, task_id, dataloader, criterion, device):
                 iter_data = iter(dataloader['train'])
                 batch = next(iter_data)
 
-            loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device) 
+            loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
             
             try:
                 batch = next(iter_data)
@@ -113,7 +129,7 @@ def train(args, net, task_id, dataloader, criterion, device):
                 iter_data = iter(dataloader['train'])
                 batch = next(iter_data)
 
-            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, save_grads) 
+            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, save_grads) 
 
         if args.mini_tasks > 0:
             print("Train: Total loss: {} \t Mini Task Loss: {}".format(total_loss/args.mini_tasks,loss_mini_task/args.mini_tasks))
