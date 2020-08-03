@@ -13,12 +13,12 @@ ntasks: 20
 n_channels: 3
 
 lr_out: 0.1
-lr_inner: 0.01
+lr_inner: 0.1
 
 out_epochs: 100
 pri_epochs: 5
-mini_tasks: 50
-inner_loop: 10
+mini_tasks: 25
+inner_loop: 50
 
 head_units: 32
 latent_dim: 128
@@ -30,9 +30,11 @@ val_iter: 10
 lr_factor: 3
 lr_min: 1.0e-06
 lr_patience: 5
+lr_patience_inner: 5
 mom: 0.9
 
-train_first: True
+#train_first: True
+train_first: False
 
 workers: 4
 seed: 48
