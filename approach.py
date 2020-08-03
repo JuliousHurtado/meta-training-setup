@@ -51,6 +51,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
     best_loss = np.inf
     best_model = copy.deepcopy(net)
     patience = patience_inner
+    factor = 1
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
@@ -82,8 +83,10 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
         else:
             patience -= 1
             if patience <= 0:
-                net.load_state_dict(copy.deepcopy(best_model).state_dict())
-                break
+                factor *= 0.5
+                for param_group in opti.param_groups:
+                    param_group['lr'] = param_group['lr']*factor
+                
         net.load_state_dict(copy.deepcopy(best_model).state_dict())
             
         #running_corrects = preds.eq(labels.view_as(preds)).sum().item()
@@ -110,24 +113,25 @@ def train(args, net, task_id, dataloader, criterion, device):
         save_grads = {}
         loss_mini_task = 0.0
         total_loss = 0.0
-        iter_data = iter(dataloader['train'])
+        iter_data_train = iter(dataloader['train'])
+        iter_data_val = iter(dataloader['valid'])
         for k in range(args.mini_tasks):
             t_net = copy.deepcopy(net)
             opti_priv = getOptimizer(False, t_net, args.lr_inner, task_id)
 
             try:
-                batch = next(iter_data)
+                batch = next(iter_data_train)
             except:
-                iter_data = iter(dataloader['train'])
-                batch = next(iter_data)
+                iter_data_train = iter(dataloader['train'])
+                batch = next(iter_data_train)
 
             loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
             
             try:
-                batch = next(iter_data)
+                batch = next(iter_data_val)
             except:
-                iter_data = iter(dataloader['train'])
-                batch = next(iter_data)
+                iter_data_val = iter(dataloader['valid'])
+                batch = next(iter_data_val)
 
             total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, save_grads) 
 
@@ -145,7 +149,7 @@ def train(args, net, task_id, dataloader, criterion, device):
         opti_total.zero_grad()
 
         if i % args.val_iter == 0:
-            opti_priv = getOptimizer(False, net, args.lr_inner, task_id)
+            opti_priv = getOptimizer(False, net, args.lr_out, task_id)
             res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
             results['train_loss'].append(res[1])
             results['train_acc'].append(res[0])
@@ -162,7 +166,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler.step(res[1])
             net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
-    opti_priv = getOptimizer(False, net, args.lr_inner, task_id)
+    opti_priv = getOptimizer(False, net, args.lr_out, task_id)
     res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
     results['train_loss'].append(res[1])
     results['train_acc'].append(res[0])
