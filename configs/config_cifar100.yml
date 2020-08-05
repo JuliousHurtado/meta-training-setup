@@ -17,7 +17,7 @@ lr_inner: 0.1
 
 out_epochs: 100
 pri_epochs: 5
-mini_tasks: 25
+mini_tasks: 0
 inner_loop: 50
 
 head_units: 32
@@ -33,8 +33,8 @@ lr_patience: 5
 lr_patience_inner: 5
 mom: 0.9
 
-#train_first: True
-train_first: False
+train_first: True
+#train_first: False
 
 workers: 4
 seed: 48

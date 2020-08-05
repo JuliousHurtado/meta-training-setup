@@ -133,3 +133,4 @@ if __name__ == '__main__':
     #     for i_loop in [1,5,10,20,35,50]:
     #         args.mini_tasks = m_task
     #         args.inner_loop = i_loop
+    main(args)
