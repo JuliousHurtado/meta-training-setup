@@ -129,8 +129,8 @@ if __name__ == '__main__':
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
 
-    for m_task in [1,5,10,20,30,40]:
-        for i_loop in [1,5,10,20,35,50]:
-            args.mini_tasks = m_task
-            args.inner_loop = i_loop
-            main(args)
+    #for m_task in [1,5,10,20,30,40]:
+    #    for i_loop in [1,5,10,20,35,50]:
+    #        args.mini_tasks = m_task
+    #        args.inner_loop = i_loop
+    main(args)
