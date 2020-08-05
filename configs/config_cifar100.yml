@@ -14,6 +14,7 @@ n_channels: 3
 
 lr_out: 0.1
 lr_inner: 0.1
+lr_priv: 0.1
 
 out_epochs: 100
 pri_epochs: 5

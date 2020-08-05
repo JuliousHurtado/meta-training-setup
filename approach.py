@@ -98,7 +98,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
 
 def train_mini_task(args, net, dataloader, task_id, criterion, device):
     iter_data_train = iter(dataloader['train'])
-    iter_data_val = iter(dataloader['valid'])
+    #iter_data_val = iter(dataloader['train'])
     
     save_grads = {}
     loss_mini_task = 0.0
@@ -119,7 +119,7 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
         try:
             batch = next(iter_data_val)
         except:
-            iter_data_val = iter(dataloader['valid'])
+            iter_data_val = iter(dataloader['train'])
             batch = next(iter_data_val)
 
         total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, save_grads)
@@ -128,8 +128,12 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
 
 def train(args, net, task_id, dataloader, criterion, device):
     opti_total = getOptimizer(True, net, args.lr_out, task_id)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
-                    factor=0.1, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
+    scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
+                    factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
+
+    opti_priv = getOptimizer(False, net, args.lr_priv, task_id)
+    scheduler_priv = optim.lr_scheduler.ReduceLROnPlateau(opti_priv, mode='min', 
+                    factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
     best_loss = np.inf
     best_model = copy.deepcopy(net)
@@ -157,35 +161,35 @@ def train(args, net, task_id, dataloader, criterion, device):
             opti_total.step()
             opti_total.zero_grad()
 
+            scheduler_priv.step(total_loss)
+
         if i % args.val_iter == 0:
-            opti_priv = getOptimizer(False, net, args.lr_out, task_id)
-            res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
-            results['train_loss'].append(res[1])
-            results['train_acc'].append(res[0])
+            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+            results['train_loss'].append(res_train[1])
+            results['train_acc'].append(res_train[0])
 
-            res = test(net, task_id, dataloader['valid'], criterion, device)
-            print("Valid: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
-            results['val_loss'].append(res[1])
-            results['val_acc'].append(res[0])
+            res_test = test(net, task_id, dataloader['valid'], criterion, device)
+            print("Tain Loss: {} \t Valid loss: {} \t Accuracy: {}".format(res_train[1],res_test[1],res_test[0]))
+            results['val_loss'].append(res_test[1])
+            results['val_acc'].append(res_test[0])
 
-            if res[1] < best_loss:
-                best_loss = res[1]
+            if res_test[1] < best_loss:
+                best_loss = res_test[1]
                 best_model = copy.deepcopy(net)
 
-            scheduler.step(res[1])
+            scheduler_priv.step(res_test[1])
             net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
-    opti_priv = getOptimizer(False, net, args.lr_out, task_id)
-    res = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
-    results['train_loss'].append(res[1])
-    results['train_acc'].append(res[0])
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+    results['train_loss'].append(res_train[1])
+    results['train_acc'].append(res_train[0])
 
-    res = test(net, task_id, dataloader['valid'], criterion, device)
-    print("Valid: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
-    results['val_loss'].append(res[1])
-    results['val_acc'].append(res[0])
+    res_test = test(net, task_id, dataloader['valid'], criterion, device)
+    print("Tain Loss: {} \t Valid loss: {} \t Accuracy: {}".format(res_train[1],res_test[1],res_test[0]))
+    results['val_loss'].append(res_test[1])
+    results['val_acc'].append(res_test[0])
 
-    if res[1] < best_loss:
+    if res_test[1] < best_loss:
         best_model = copy.deepcopy(net)
 
     net.load_state_dict(copy.deepcopy(best_model).state_dict())
@@ -200,7 +204,7 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
     best_model = copy.deepcopy(net)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
-                    factor=0.1, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
+                    factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
     results = {
         'meta_loss': [],
