@@ -91,6 +91,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
     return running_loss/inner_loop
 
 def train_mini_task(args, net, dataloader, task_id, criterion, device):
+    net.train()
     iter_data_train = iter(dataloader['train'])
     iter_data_val = iter(dataloader['valid'])
     
