@@ -74,7 +74,6 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
             opti.step()
             opti.zero_grad()
 
-            # print(l.item())
         running_loss += l.item()
 
         if l.item() < best_loss:
@@ -88,10 +87,39 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
                     param_group['lr'] = param_group['lr']*factor
                 
         net.load_state_dict(copy.deepcopy(best_model).state_dict())
-            
-        #running_corrects = preds.eq(labels.view_as(preds)).sum().item()
 
     return running_loss/inner_loop
+
+def train_mini_task(args, net, dataloader, task_id, criterion, device):
+    net.train()
+    iter_data_train = iter(dataloader['train'])
+    iter_data_val = iter(dataloader['valid'])
+    
+    save_grads = {}
+    loss_mini_task = 0.0
+    total_loss = 0.0
+
+    for k in range(args.mini_tasks):
+        t_net = copy.deepcopy(net)
+        opti_priv = getOptimizer(False, t_net, args.lr_inner, task_id)
+
+        try:
+            batch = next(iter_data_train)
+        except:
+            iter_data_train = iter(dataloader['train'])
+            batch = next(iter_data_train)
+
+        loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
+
+        try:
+            batch = next(iter_data_val)
+        except:
+            iter_data_val = iter(dataloader['valid'])
+            batch = next(iter_data_val)
+
+        total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, save_grads)
+
+    return save_grads, total_loss, loss_mini_task
 
 def train(args, net, task_id, dataloader, criterion, device):
     opti_total = getOptimizer(True, net, args.lr_out, task_id)
@@ -110,43 +138,19 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
     for i in range(args.out_epochs):
-        save_grads = {}
-        loss_mini_task = 0.0
-        total_loss = 0.0
-        iter_data_train = iter(dataloader['train'])
-        iter_data_val = iter(dataloader['valid'])
-        for k in range(args.mini_tasks):
-            t_net = copy.deepcopy(net)
-            opti_priv = getOptimizer(False, t_net, args.lr_inner, task_id)
-
-            try:
-                batch = next(iter_data_train)
-            except:
-                iter_data_train = iter(dataloader['train'])
-                batch = next(iter_data_train)
-
-            loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
-            
-            try:
-                batch = next(iter_data_val)
-            except:
-                iter_data_val = iter(dataloader['valid'])
-                batch = next(iter_data_val)
-
-            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, save_grads) 
-
         if args.mini_tasks > 0:
+            save_grads, total_loss, loss_mini_task = train_mini_task(args, net, dataloader, task_id, criterion, device)
             print("Train: Total loss: {} \t Mini Task Loss: {}".format(total_loss/args.mini_tasks,loss_mini_task/args.mini_tasks))
             results['meta_loss'].append(total_loss/args.mini_tasks)
             results['mini_loss'].append(loss_mini_task/args.mini_tasks)
 
-        for n, p in net.named_parameters():
-            if n in save_grads and save_grads[n] is not None:   
-                p.grad = save_grads[n]/args.mini_tasks
-            else:
-                p.grad = None
-        opti_total.step()
-        opti_total.zero_grad()
+            for n, p in net.named_parameters():
+                if n in save_grads and save_grads[n] is not None:   
+                    p.grad = save_grads[n]/args.mini_tasks
+                else:
+                    p.grad = None
+            opti_total.step()
+            opti_total.zero_grad()
 
         if i % args.val_iter == 0:
             opti_priv = getOptimizer(False, net, args.lr_out, task_id)
@@ -155,7 +159,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             results['train_acc'].append(res[0])
 
             res = test(net, task_id, dataloader['valid'], criterion, device)
-            print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+            print("Valid: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
             results['val_loss'].append(res[1])
             results['val_acc'].append(res[0])
 
@@ -172,7 +176,7 @@ def train(args, net, task_id, dataloader, criterion, device):
     results['train_acc'].append(res[0])
 
     res = test(net, task_id, dataloader['valid'], criterion, device)
-    print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+    print("Valid: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
     results['val_loss'].append(res[1])
     results['val_acc'].append(res[0])
 
@@ -202,23 +206,21 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
     for i in range(args.out_epochs):
-        res = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device)
-        results['train_loss'].append(res[1])
-        results['train_acc'].append(res[0])
+        res_train = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device)
+        results['train_loss'].append(res_train[1])
+        results['train_acc'].append(res_train[0])
 
-        print("Train: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
+        res_test = test(net, task_id, dataloader['valid'], criterion, device)
+        results['val_loss'].append(res_test[1])
+        results['val_acc'].append(res_test[0])
 
-        res = test(net, task_id, dataloader['valid'], criterion, device)
-        results['val_loss'].append(res[1])
-        results['val_acc'].append(res[0])
+        print("Tain Loss: {} \t Valid loss: {} \t Accuracy: {}".format(res_train[1],res_test[1],res_test[0]))
 
-        print("Validation: Total loss: {} \t Accuracy: {}".format(res[1],res[0]))
-
-        if res[1] < best_loss:
-            best_loss = res[1]
+        if res_test[1] < best_loss:
+            best_loss = res_test[1]
             best_model = copy.deepcopy(net)
 
-        scheduler.step(res[1])
+        scheduler.step(res_test[1])
         net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
     return results

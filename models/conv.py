@@ -23,19 +23,19 @@ class Shared(torch.nn.Module):
         self.conv1=torch.nn.Conv2d(self.ncha,hiddens[0],kernel_size=k_size[0])
         s=compute_conv_output_size(size,k_size[0])
         s=s//2
-        self.bn1 = torch.nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
+        # self.bn1 = torch.nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
         self.conv2=torch.nn.Conv2d(hiddens[0],hiddens[1],kernel_size=k_size[1])
         s=compute_conv_output_size(s,k_size[1])
         s=s//2
-        self.bn2 = torch.nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
+        # self.bn2 = torch.nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
         self.conv3=torch.nn.Conv2d(hiddens[1],hiddens[2],kernel_size=k_size[2])
         s=compute_conv_output_size(s,k_size[2])
         s=s//2
-        self.bn3 = torch.nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
+        # self.bn3 = torch.nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
         self.maxpool=torch.nn.MaxPool2d(2)
         self.relu=torch.nn.ReLU()
 
-        #self.drop1=torch.nn.Dropout(0.2)
+        self.drop1=torch.nn.Dropout(0.2)
         self.drop2=torch.nn.Dropout(0.5)
         self.fc1=torch.nn.Linear(hiddens[2]*s*s,hiddens[3])
         self.fc2=torch.nn.Linear(hiddens[3],hiddens[4])
@@ -47,11 +47,11 @@ class Shared(torch.nn.Module):
         if len(x_s.size()) == 2:
             x_s = x_s.view(x_s.size(0), 1, 28, 28)
 
-        h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
+        h = self.maxpool(self.relu(self.drop1(self.conv1(x_s))))
         h = h * mask[0]
-        h = self.maxpool(self.relu(self.bn2(self.conv2(h))))
+        h = self.maxpool(self.relu(self.drop1(self.conv2(h))))
         h = h * mask[1]
-        h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
+        h = self.maxpool(self.relu(self.drop2(self.conv3(h))))
         h = h * mask[2]
         h = h.view(x_s.size(0), -1)
         h = self.drop2(self.relu(self.fc1(h)))
@@ -86,8 +86,9 @@ class Private(torch.nn.Module):
             s = self.size
             for j in range(self.layers):
                 layer = torch.nn.Sequential()
-                layer.add_module('conv{}'.format(j+1),torch.nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
+                layer.add_module('conv{}'.format(j+1), torch.nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
                 layer.add_module('bn{}'.format(j+1), torch.nn.BatchNorm2d(hiddens[j+1]))
+                #layer.add_module('drop{}'.format(j+1), torch.nn.Dropout(0.2))
                 layer.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
                 layer.add_module('maxpool{}'.format(j+1), torch.nn.MaxPool2d(2))
                 conv.append(layer)
