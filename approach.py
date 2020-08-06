@@ -27,6 +27,28 @@ def getOptimizer(shared, net, lr, task_id):
 
     return optim.SGD(params, lr, weight_decay=0.01, momentum=0.9)
 
+def init_grads_out(net, shared, priv, task_id):
+    grads = {}
+
+    if shared:
+        for n,p in net.shared.named_parameters():
+            grads[n] = torch.zeros_like(p)
+
+    if priv:
+        for p in net.private.conv[task_id].named_parameters():
+            grads[n] = torch.zeros_like(p)
+
+        for p in net.private.linear[task_id].named_parameters():
+            grads[n] = torch.zeros_like(p)
+
+        for p in net.private.last_em[task_id].named_parameters():
+            grads[n] = torch.zeros_like(p)
+
+        for p in net.head[task_id].named_parameters():
+            grads[n] = torch.zeros_like(p)
+
+    return grads
+
 def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
     net.train()
     for e in range(epochs):
@@ -71,11 +93,8 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
 
         if type(save_grad) == dict:
             for name, param in net.named_parameters():
-                if param.grad is not None:
-                    if name not in save_grad:
-                        save_grad[name] = param.grad
-                    else:
-                        save_grad[name] += param.grad
+                if param.grad is not None and name in save_grad:
+                    save_grad[name] += param.grad
         else:
             opti.step()
             opti.zero_grad()
@@ -98,9 +117,9 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
 
 def train_mini_task(args, net, dataloader, task_id, criterion, device):
     iter_data_train = iter(dataloader['train'])
-    #iter_data_val = iter(dataloader['train'])
+    iter_data_val = iter(dataloader['train'])
     
-    save_grads = {}
+    save_grads = init_grads_out(net, True, False, task_id)
     loss_mini_task = 0.0
     total_loss = 0.0
 
@@ -127,8 +146,8 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     return save_grads, total_loss, loss_mini_task
 
 def train(args, net, task_id, dataloader, criterion, device):
-    opti_total = getOptimizer(True, net, args.lr_out, task_id)
-    scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_total, mode='min', 
+    opti_shar = getOptimizer(True, net, args.lr_out, task_id)
+    scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_shar, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
     opti_priv = getOptimizer(False, net, args.lr_priv, task_id)
@@ -154,14 +173,14 @@ def train(args, net, task_id, dataloader, criterion, device):
             results['mini_loss'].append(loss_mini_task/args.mini_tasks)
 
             for n, p in net.named_parameters():
-                if n in save_grads and save_grads[n] is not None:   
+                if n in save_grads:   
                     p.grad = save_grads[n]/args.mini_tasks
                 else:
                     p.grad = None
-            opti_total.step()
-            opti_total.zero_grad()
+            opti_shar.step()
+            opti_shar.zero_grad()
 
-            scheduler_priv.step(total_loss)
+            scheduler_shar.step(total_loss)
 
         if i % args.val_iter == 0:
             res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
@@ -169,7 +188,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             results['train_acc'].append(res_train[0])
 
             res_test = test(net, task_id, dataloader['valid'], criterion, device)
-            print("Tain Loss: {} \t Valid loss: {} \t Accuracy: {}".format(res_train[1],res_test[1],res_test[0]))
+            print("Tain loss: {}\t Acc: {}\t Valid loss: {}\t Acc: {}".format(res_train[1],res_train[0],res_test[1],res_test[0]))
             results['val_loss'].append(res_test[1])
             results['val_acc'].append(res_test[0])
 
@@ -185,7 +204,7 @@ def train(args, net, task_id, dataloader, criterion, device):
     results['train_acc'].append(res_train[0])
 
     res_test = test(net, task_id, dataloader['valid'], criterion, device)
-    print("Tain Loss: {} \t Valid loss: {} \t Accuracy: {}".format(res_train[1],res_test[1],res_test[0]))
+    print("Tain loss: {}\t Acc: {}\t Valid loss: {}\t Acc: {}".format(res_train[1],res_train[0],res_test[1],res_test[0]))
     results['val_loss'].append(res_test[1])
     results['val_acc'].append(res_test[0])
 

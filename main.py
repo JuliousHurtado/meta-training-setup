@@ -74,7 +74,7 @@ def run(args, run_id):
         for u in range(t+1):
             test_res = test(net, u, dataset[u]['test'], criterion, device)
 
-            print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u, dataset[u]['name'],
+            print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u+1, dataset[u]['name'],
                                                                                           test_res[1],
                                                                                           test_res[0]))
 
