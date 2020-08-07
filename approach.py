@@ -125,7 +125,7 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
 
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net)
-        opti_priv = getOptimizer(False, t_net, args.lr_inner, task_id)
+        opti_priv = getOptimizer(args.train_shared_mini, t_net, args.lr_inner, task_id)
 
         try:
             batch = next(iter_data_train)
@@ -165,6 +165,16 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_loss': [],
         'train_acc': []
     }
+
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+    results['train_loss'].append(res_train[1])
+    results['train_acc'].append(res_train[0])
+
+    res_test = test(net, task_id, dataloader['valid'], criterion, device)
+    print("Tain loss: {}\t Acc: {}\t Valid loss: {}\t Acc: {}".format(res_train[1],res_train[0],res_test[1],res_test[0]))
+    results['val_loss'].append(res_test[1])
+    results['val_acc'].append(res_test[0])
+
     for i in range(args.out_epochs):
         if args.mini_tasks > 0:
             save_grads, total_loss, loss_mini_task = train_mini_task(args, net, dataloader, task_id, criterion, device)
