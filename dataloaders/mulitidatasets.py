@@ -20,7 +20,7 @@ from torchvision import transforms
 mean_datasets = {
     'CIFAR10': [x/255 for x in [125.3,123.0,113.9]],
     'notMNIST': (0.4254,),
-    'MNIST': (0.1,) ,
+    'MNIST': (0.1307,) ,
     'SVHN':[0.4377,0.4438,0.4728] ,
     'FashionMNIST': (0.2190,),
 
@@ -28,7 +28,7 @@ mean_datasets = {
 std_datasets = {
     'CIFAR10': [x/255 for x in [63.0,62.1,66.7]],
     'notMNIST': (0.4501,),
-    'MNIST': (0.2752,),
+    'MNIST': (0.3081,),
     'SVHN': [0.198,0.201,0.197],
     'FashionMNIST': (0.3318,)
 }
@@ -87,7 +87,8 @@ class DatasetGen(object):
         self.pin_memory = True
 
         np.random.seed(self.seed)
-        self.datasets_idx = list(np.random.permutation(self.num_tasks))
+        #self.datasets_idx = list(np.random.permutation(self.num_tasks))
+        self.datasets_idx = [0,1,2,3,4]
         print('Task order =', [list(classes_datasets.keys())[item] for item in self.datasets_idx])
         self.datasets_names = [list(classes_datasets.keys())[item] for item in self.datasets_idx]
 
@@ -142,45 +143,36 @@ class DatasetGen(object):
         self.use_memory = args.use_memory
 
 
-    def get_dataset(self, dataset_idx, task_num, num_samples_per_class=False, normalize=True):
+    def get_dataset(self, dataset_idx, task_num, num_samples_per_class=False):
         dataset_name = list(mean_datasets.keys())[dataset_idx]
         nspc = num_samples_per_class
-        if normalize:
-            transformation = transforms.Compose([transforms.ToTensor(),
-                                                 transforms.Normalize(mean_datasets[dataset_name],std_datasets[dataset_name])])
-            mnist_transformation = transforms.Compose([
-                transforms.Pad(padding=2, fill=0),
-                transforms.ToTensor(),
-                transforms.Normalize(mean_datasets[dataset_name], std_datasets[dataset_name])])
-        else:
-            transformation = transforms.Compose([transforms.ToTensor()])
-            mnist_transformation = transforms.Compose([
-                transforms.Pad(padding=2, fill=0),
-                transforms.ToTensor(),
-                ])
+
+        transformation = transforms.Compose([transforms.CenterCrop(28),
+                                             transforms.ToTensor(),
+                                             transforms.Normalize(mean_datasets[dataset_name],std_datasets[dataset_name])])
 
         # target_transormation = transforms.Compose([transforms.ToTensor()])
         target_transormation = None
 
         if dataset_idx == 0:
-            trainset = CIFAR10_(root=self.root, task_num=task_num, num_samples_per_class=nspc, train=True, download=self.download, target_transform = target_transormation, transform=transformation)
-            testset = CIFAR10_(root=self.root,  task_num=task_num, num_samples_per_class=nspc, train=False, download=self.download, target_transform = target_transormation, transform=transformation)
+            trainset = CIFAR10_(root=self.root, task_num=task_num, num_samples_per_class=nspc, train=True, download=self.download, transform=transformation)
+            testset = CIFAR10_(root=self.root,  task_num=task_num, num_samples_per_class=nspc, train=False, download=self.download, transform=transformation)
 
         if dataset_idx == 1:
-            trainset = notMNIST_(root=self.root, task_num=task_num, num_samples_per_class=nspc, train=True, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
-            testset = notMNIST_(root=self.root,  task_num=task_num, num_samples_per_class=nspc, train=False, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
+            trainset = notMNIST_(root=self.root, task_num=task_num, num_samples_per_class=nspc, train=True, download=self.download, transform=transformation)
+            testset = notMNIST_(root=self.root,  task_num=task_num, num_samples_per_class=nspc, train=False, download=self.download, transform=transformation)
 
         if dataset_idx == 2:
-            trainset = MNIST_RGB(root=self.root, train=True, num_samples_per_class=nspc, task_num=task_num, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
-            testset = MNIST_RGB(root=self.root,  train=False, num_samples_per_class=nspc, task_num=task_num, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
+            trainset = MNIST_RGB(root=self.root, train=True, num_samples_per_class=nspc, task_num=task_num, download=self.download, transform=transformation)
+            testset = MNIST_RGB(root=self.root,  train=False, num_samples_per_class=nspc, task_num=task_num, download=self.download, transform=transformation)
 
         if dataset_idx == 3:
-            trainset = SVHN_(root=self.root,  train=True, num_samples_per_class=nspc, task_num=task_num, download=self.download, target_transform = target_transormation, transform=transformation)
-            testset = SVHN_(root=self.root,  train=False, num_samples_per_class=nspc, task_num=task_num, download=self.download, target_transform = target_transormation, transform=transformation)
+            trainset = SVHN_(root=self.root,  train=True, num_samples_per_class=nspc, task_num=task_num, download=self.download, transform=transformation)
+            testset = SVHN_(root=self.root,  train=False, num_samples_per_class=nspc, task_num=task_num, download=self.download, transform=transformation)
 
         if dataset_idx == 4:
-            trainset = FashionMNIST_(root=self.root, num_samples_per_class=nspc, task_num=task_num, train=True, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
-            testset = FashionMNIST_(root=self.root,  num_samples_per_class=nspc, task_num=task_num, train=False, download=self.download, target_transform = target_transormation, transform=mnist_transformation)
+            trainset = FashionMNIST_(root=self.root, num_samples_per_class=nspc, task_num=task_num, train=True, download=self.download, transform=transformation)
+            testset = FashionMNIST_(root=self.root,  num_samples_per_class=nspc, task_num=task_num, train=False, download=self.download, transform=transformation)
 
         return trainset, testset
 

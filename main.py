@@ -62,6 +62,8 @@ def run(args, run_id):
         print(' '*75, 'Dataset {:2d} ({:s})'.format(t+1,dataset[t]['name']))
         print('*'*150)
 
+        if args.experiment == 'multidatasets':
+            args.lr_task = dataloader.lrs[t][1]
         # Train
         if args.train_first and t == 0:
             res_task = trainAll(args, net, t, dataset[t], criterion, device)

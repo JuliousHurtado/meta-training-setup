@@ -38,12 +38,17 @@ class Shared(torch.nn.Module):
         # self.drop1=torch.nn.Dropout(0.2)
         self.drop2=torch.nn.Dropout(0.5)
         self.fc1=torch.nn.Linear(hiddens[2]*s*s,hiddens[3])
-        self.fc2=torch.nn.Linear(hiddens[3],hiddens[4])
-        self.fc3=torch.nn.Linear(hiddens[4],hiddens[5])
-        self.fc4=torch.nn.Linear(hiddens[5], self.latent_dim)
+        self.bn4=torch.nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
+        self.fc2=torch.nn.Linear(hiddens[3],self.latent_dim)
+        self.bn5=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
+        # self.fc3=torch.nn.Linear(hiddens[4],hiddens[5])
+        # self.bn6=torch.nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
+        # self.fc4=torch.nn.Linear(hiddens[5], self.latent_dim)
+        # self.bn7=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
 
 
     def forward(self, x_s, mask):
+        # print(x_s.size())
         if len(x_s.size()) == 2:
             x_s = x_s.view(x_s.size(0), 1, 28, 28)
 
@@ -54,10 +59,10 @@ class Shared(torch.nn.Module):
         h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
         h = h * mask[2]
         h = h.view(x_s.size(0), -1)
-        h = self.drop2(self.relu(self.fc1(h)))
-        h = self.drop2(self.relu(self.fc2(h)))
-        h = self.drop2(self.relu(self.fc3(h)))
-        h = self.drop2(self.relu(self.fc4(h)))
+        h = self.drop2(self.bn4(self.relu(self.fc1(h))))
+        h = self.drop2(self.bn5(self.relu(self.fc2(h))))
+        # h = self.drop2(self.bn6(self.relu(self.fc3(h))))
+        # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
 
 
@@ -95,7 +100,7 @@ class Private(torch.nn.Module):
 
                 mask_lin = torch.nn.Sequential()
                 mask_lin.add_module('linear{}'.format(j+1), torch.nn.Linear(hiddens[j+1],hiddens[j+1]*2))
-                mask_lin.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
+                mask_lin.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True)) #FiLM does not use sigmoid
                 linear.append(mask_lin)
 
                 s=compute_conv_output_size(s,k_size[j])
@@ -103,7 +108,9 @@ class Private(torch.nn.Module):
 
             last_em = torch.nn.Sequential(
                                 torch.nn.Linear(hiddens[j+1]*s*s, self.latent_dim),
-                                torch.nn.ReLU(inplace=True), #FiLM does not use sigmoid
+                                torch.nn.BatchNorm1d(self.latent_dim),
+                                torch.nn.ReLU(inplace=True), 
+                                torch.nn.Dropout(0.5),
                     )
 
             self.conv.append(conv)
@@ -154,7 +161,7 @@ class Net(torch.nn.Module):
             hiddens = [64, 128, 256, 1024, 1024, 512]
 
         elif args.experiment == 'mnist5' or args.experiment == 'pmnist':
-             hiddens = [32, 64, 128, 256, 256, 256]
+            hiddens = [32, 64, 128, 256, 256, 256]
 
         else:
             raise NotImplementedError
@@ -162,14 +169,21 @@ class Net(torch.nn.Module):
         self.shared = Shared(args, hiddens)
         self.private = Private(args, hiddens, 3)
 
+        self.con_pri_shd = args.con_pri_shd
+        factor = 1
+        if args.con_pri_shd:
+            factor = 2
+
         self.head = torch.nn.ModuleList()
         for i in range(self.num_tasks):
             self.head.append(
                 torch.nn.Sequential(
-                    torch.nn.Linear(2*self.latent_dim, self.hidden1),
+                    torch.nn.Linear(factor*self.latent_dim, self.hidden1),
+                    torch.nn.BatchNorm1d(self.hidden1),
                     torch.nn.ReLU(inplace=True),
                     torch.nn.Dropout(),
                     torch.nn.Linear(self.hidden1, self.hidden2),
+                    torch.nn.BatchNorm1d(self.hidden2),
                     torch.nn.ReLU(inplace=True),
                     torch.nn.Linear(self.hidden2, self.taskcla[i][1])
                 ))
@@ -179,12 +193,11 @@ class Net(torch.nn.Module):
         m_p, x_p = self.private(x_p, task_id)
         x_s = self.shared(x_s, m_p)
         
-        x = torch.cat([x_p, x_s], dim=1)
+        if self.con_pri_shd:
+            x = torch.cat([x_p, x_s], dim=1)
+        else:
+            x = x_s
         return self.head[task_id](x)
-
-
-    def get_encoded_ftrs(self, x_s, x_p, task_id):
-        return self.shared(x_s), self.private(x_p, task_id)
 
     def print_model_size(self):
         count_P = sum(p.numel() for p in self.private.parameters() if p.requires_grad)

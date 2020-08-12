@@ -61,7 +61,7 @@ class CIFAR10_(datasets.CIFAR10):
     }
     num_classes = 10
 
-    def __init__(self, root, task_num, num_samples_per_class, train, transform, target_transform, download=True):
+    def __init__(self, root, task_num, num_samples_per_class, train, transform, target_transform=None, download=True):
         # root, task_num, train, transform = None, download = False):
         super(CIFAR10_, self).__init__(root, task_num, transform=transform,
                                         target_transform=target_transform,
