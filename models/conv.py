@@ -53,11 +53,14 @@ class Shared(torch.nn.Module):
             x_s = x_s.view(x_s.size(0), 1, 28, 28)
 
         h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
-        h = h * mask[0]
+        if mask:
+            h = h * mask[0]
         h = self.maxpool(self.relu(self.bn2(self.conv2(h))))
-        h = h * mask[1]
+        if mask:
+            h = h * mask[1]
         h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
-        h = h * mask[2]
+        if mask:
+            h = h * mask[2]
         h = h.view(x_s.size(0), -1)
         h = self.drop2(self.bn4(self.relu(self.fc1(h))))
         h = self.drop2(self.bn5(self.relu(self.fc2(h))))
@@ -166,12 +169,20 @@ class Net(torch.nn.Module):
         else:
             raise NotImplementedError
 
-        self.shared = Shared(args, hiddens)
-        self.private = Private(args, hiddens, 3)
+        self.shared = None
+        self.private = None
+        if args.use_share:
+            self.shared = Shared(args, hiddens)
+        if args.use_private:
+            self.private = Private(args, hiddens, 3)
 
         self.con_pri_shd = args.con_pri_shd
+        self.use_share = args.use_share
+        self.use_private = args.use_private
+        self.use_mask = args.use_mask
+
         factor = 1
-        if args.con_pri_shd:
+        if self.con_pri_shd:
             factor = 2
 
         self.head = torch.nn.ModuleList()
@@ -190,18 +201,34 @@ class Net(torch.nn.Module):
 
 
     def forward(self, x_s, x_p, task_id):
-        m_p, x_p = self.private(x_p, task_id)
-        x_s = self.shared(x_s, m_p)
-        
-        if self.con_pri_shd:
-            x = torch.cat([x_p, x_s], dim=1)
+        if self.use_private:
+            m_p, x_p = self.private(x_p, task_id)
         else:
+            m_p = None
+
+        if not self.use_mask:
+            m_p = None
+
+        if self.use_share:
+            x_s = self.shared(x_s, m_p)
+        
+        if self.use_share and self.use_private and self.con_pri_shd:
+            x = torch.cat([x_p, x_s], dim=1)
+        elif self.use_share:
             x = x_s
+        else:
+            x = x_p
         return self.head[task_id](x)
 
     def print_model_size(self):
-        count_P = sum(p.numel() for p in self.private.parameters() if p.requires_grad)
-        count_S = sum(p.numel() for p in self.shared.parameters() if p.requires_grad)
+        if self.use_private:
+            count_P = sum(p.numel() for p in self.private.parameters() if p.requires_grad)
+        else:
+            count_P = 0
+        if self.use_share:
+            count_S = sum(p.numel() for p in self.shared.parameters() if p.requires_grad)
+        else:
+            count_S = 0
         count_H = sum(p.numel() for p in self.head.parameters() if p.requires_grad)
 
         print('Num parameters in S       = %s ' % (self.pretty_print(count_S)))

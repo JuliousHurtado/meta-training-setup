@@ -28,7 +28,7 @@ def getOptimizer(shared, private, net, lr, task_id):
 
     return optim.SGD(params, lr, weight_decay=0.01, momentum=0.9)
 
-def init_grads_out(net, shared, priv, task_id):
+def init_grads_out(net):
     grads = {}
 
     for n,p in net.named_parameters():
@@ -57,7 +57,7 @@ def print_sum_params(net, task_id):
     print(s)
 
 def set_grads(net, save_grads, task_id, num_mini_tasks):
-    for n,p in net.shared.named_parameters():
+    for n,p in enumerate(net.shared.named_parameters()):
         if n in save_grads:
             p.grad = save_grads[n]/num_mini_tasks
 
@@ -111,7 +111,6 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
-    # print("New batch")
     for _ in range(inner_loop):
         if opti is not None:
             opti.zero_grad()
@@ -119,13 +118,20 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
         outs = net(inputs.clone(), inputs.clone(), task_id)
         _, preds = torch.max(outs, 1)
 
+        correct = preds.eq(labels.view_as(preds)).sum().item()
         l = criterion(outs, labels)
         l.backward()
 
         if type(save_grad) == dict:
+            save_grad['acc'].append(correct/inputs.size(0))
+
+            local_grad = init_grads_out(net)
             for name, param in net.named_parameters():
-                if param.grad is not None and name in save_grad:
-                    save_grad[name] += param.grad
+                if param.grad is not None:
+                    local_grad[name] = param.grad.clone()
+
+            save_grad['grads'].append(local_grad)
+
         else:
             opti.step()
 
@@ -143,16 +149,15 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
                 
         net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
-    return running_loss#/inner_loop
+    return running_loss
 
 def train_mini_task(args, net, dataloader, task_id, criterion, device):
     iter_data_train = iter(dataloader['train'])
     iter_data_val = iter(dataloader['train'])
     
-    save_grads = init_grads_out(net, args.shd_meta, args.pri_meta, task_id)
+    grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
-
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net)
         opti_priv = getOptimizer(args.shd_mini, args.pri_mini, t_net, args.lr_mini, task_id)
@@ -165,7 +170,6 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
 
         loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
 
-        mini_save_grads = init_grads_out(net, args.shd_meta, args.pri_meta, task_id)
         for k in range(args.mini_tests):
             try:
                 batch = next(iter_data_val)
@@ -173,11 +177,14 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
                 iter_data_val = iter(dataloader['train'])
                 batch = next(iter_data_val)
 
-            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, mini_save_grads)
+            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, grads_acc)
 
-        for n in save_grads:
-            save_grads[n] += mini_save_grads[n]/args.mini_tests
-
+    save_grads = init_grads_out(net)
+    weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
+    for i, g in enumerate(grads_acc['grads']):
+        for n in g:
+            save_grads[n] += g[n]*weights[i]/args.mini_tasks
+    #Ponderacion
     return save_grads, total_loss, loss_mini_task
 
 def train(args, net, task_id, dataloader, criterion, device):
@@ -262,7 +269,7 @@ def train(args, net, task_id, dataloader, criterion, device):
 
 def trainAll(args, net, task_id, dataloader, criterion, device):
     net.train()
-    opti_total = getOptimizer(True, True, net, args.lr_task, task_id)
+    opti_total = getOptimizer(args.use_share, args.use_private, net, args.lr_task, task_id)
 
     best_loss = np.inf
     best_model = copy.deepcopy(net)
