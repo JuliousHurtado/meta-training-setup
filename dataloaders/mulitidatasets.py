@@ -87,8 +87,8 @@ class DatasetGen(object):
         self.pin_memory = True
 
         np.random.seed(self.seed)
-        #self.datasets_idx = list(np.random.permutation(self.num_tasks))
-        self.datasets_idx = [0,1,2,3,4]
+        self.datasets_idx = list(np.random.permutation(self.num_tasks))
+        # self.datasets_idx = [0,1,2,3,4]
         print('Task order =', [list(classes_datasets.keys())[item] for item in self.datasets_idx])
         self.datasets_names = [list(classes_datasets.keys())[item] for item in self.datasets_idx]
 

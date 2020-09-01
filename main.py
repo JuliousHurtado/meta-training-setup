@@ -65,7 +65,7 @@ def run(args, run_id):
         if args.experiment == 'multidatasets':
             args.lr_task = dataloader.lrs[t][1]
         # Train
-        if args.train_first and t == 0:
+        if args.train_first and (t == 0 or not (args.use_share and args.use_private)):
             res_task = trainAll(args, net, t, dataset[t], criterion, device)
         else:
             res_task = train(args, net, t, dataset[t], criterion, device)
