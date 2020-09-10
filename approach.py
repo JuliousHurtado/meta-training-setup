@@ -6,7 +6,7 @@ from torch import optim
 
 
 
-def getOptimizer(shared, private, net, lr, task_id):
+def getOptimizer(shared, private, head, net, lr, task_id):
     params = []
 
     if private:
@@ -19,6 +19,7 @@ def getOptimizer(shared, private, net, lr, task_id):
         for p in net.private.last_em[task_id].parameters():
             params.append(p)
 
+    if head:
         for p in net.head[task_id].parameters():
             params.append(p)
 
@@ -40,7 +41,7 @@ def print_sum_params(net, task_id):
     s = 0
     for n,p in net.shared.named_parameters():
         s += p.sum()
-    print(s)
+    print("Shared: ",s)
 
     s = 0
     for n,p in net.private.conv[task_id].named_parameters():
@@ -51,10 +52,12 @@ def print_sum_params(net, task_id):
 
     for n,p in net.private.last_em[task_id].named_parameters():
         s += p.sum()
-
+    print("Private: ",s)
+    
+    s = 0
     for n,p in net.head[task_id].named_parameters():
         s += p.sum()
-    print(s)
+    print("Head: ",s)
 
 def set_grads(net, save_grads, task_id, num_mini_tasks):
     for n,p in enumerate(net.shared.named_parameters()):
@@ -115,7 +118,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
         if opti is not None:
             opti.zero_grad()
 
-        outs = net(inputs.clone(), inputs.clone(), task_id)
+        outs = net(inputs.clone(), inputs.clone(), task_id, True)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.view_as(preds)).sum().item()
@@ -160,7 +163,7 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     total_loss = 0.0
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net)
-        opti_priv = getOptimizer(args.shd_mini, args.pri_mini, t_net, args.lr_mini, task_id)
+        opti_priv = getOptimizer(args.shad_mini, args.priv_mini, args.head_mini, t_net, args.lr_mini, task_id)
 
         try:
             batch = next(iter_data_train)
@@ -188,11 +191,11 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     return save_grads, total_loss, loss_mini_task
 
 def train(args, net, task_id, dataloader, criterion, device):
-    opti_shar = getOptimizer(args.shd_meta, args.pri_meta, net, args.lr_meta, task_id)
+    opti_shar = getOptimizer(args.shad_meta, args.priv_meta, args.head_meta, net, args.lr_meta, task_id)
     scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_shar, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
-    opti_priv = getOptimizer(args.shd_task, args.pri_task, net, args.lr_task, task_id)
+    opti_priv = getOptimizer(args.shad_task, args.priv_task, args.head_task, net, args.lr_task, task_id)
     scheduler_priv = optim.lr_scheduler.ReduceLROnPlateau(opti_priv, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
@@ -269,7 +272,7 @@ def train(args, net, task_id, dataloader, criterion, device):
 
 def trainAll(args, net, task_id, dataloader, criterion, device):
     net.train()
-    opti_total = getOptimizer(args.use_share, args.use_private, net, args.lr_task, task_id)
+    opti_total = getOptimizer(args.use_share, args.use_private, True, net, args.lr_task, task_id)
 
     best_loss = np.inf
     best_model = copy.deepcopy(net)

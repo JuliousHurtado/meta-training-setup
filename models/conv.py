@@ -6,6 +6,8 @@
 import torch
 import numpy as np
 
+# from regularization import MaskRegularization, DiffRegularization
+
 def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
     return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
 
@@ -46,7 +48,6 @@ class Shared(torch.nn.Module):
         # self.fc4=torch.nn.Linear(hiddens[5], self.latent_dim)
         # self.bn7=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
 
-
     def forward(self, x_s, mask):
         # print(x_s.size())
         if len(x_s.size()) == 2:
@@ -62,12 +63,11 @@ class Shared(torch.nn.Module):
         if mask:
             h = h * mask[2]
         h = h.view(x_s.size(0), -1)
-        h = self.drop2(self.bn4(self.relu(self.fc1(h))))
+        h = self.drop2(self.relu(self.bn4(self.fc1(h))))
         h = self.drop2(self.bn5(self.relu(self.fc2(h))))
         # h = self.drop2(self.bn6(self.relu(self.fc3(h))))
         # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
-
 
 
 class Private(torch.nn.Module):
@@ -103,7 +103,8 @@ class Private(torch.nn.Module):
 
                 mask_lin = torch.nn.Sequential()
                 mask_lin.add_module('linear{}'.format(j+1), torch.nn.Linear(hiddens[j+1],hiddens[j+1]*2))
-                mask_lin.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True)) #FiLM does not use sigmoid
+                mask_lin.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
+                mask_lin.add_module('sigmoid{}'.format(j+1), torch.nn.Sigmoid())
                 linear.append(mask_lin)
 
                 s=compute_conv_output_size(s,k_size[j])
@@ -169,6 +170,13 @@ class Net(torch.nn.Module):
         else:
             raise NotImplementedError
 
+        # self.regs = []
+        # if args.mask_reg:
+        #     self.regs.append(MaskRegularization(args.mask_theta))
+
+        # if args.diff_reg:
+        #     self.regs.append(DiffRegularization(args.diff_theta))
+
         self.shared = None
         self.private = None
         if args.use_share:
@@ -180,6 +188,7 @@ class Net(torch.nn.Module):
         self.use_share = args.use_share
         self.use_private = args.use_private
         self.use_mask = args.use_mask
+        # self.diff_pri_shar = args.diff_pri_shar
 
         factor = 1
         if self.con_pri_shd:
@@ -200,7 +209,7 @@ class Net(torch.nn.Module):
                 ))
 
 
-    def forward(self, x_s, x_p, task_id):
+    def forward(self, x_s, x_p, task_id, use_only_share=False):
         if self.use_private:
             m_p, x_p = self.private(x_p, task_id)
         else:
@@ -210,9 +219,13 @@ class Net(torch.nn.Module):
             m_p = None
 
         if self.use_share:
+            #if self.diff_pri_shar:
+            #    x_s = torch.cat((x_s[:int(x_p.size(0)/2)], x_s[int(x_p.size(0)/2):]))
             x_s = self.shared(x_s, m_p)
         
-        if self.use_share and self.use_private and self.con_pri_shd:
+        if use_only_share:
+            x = torch.cat([torch.zeros_like(x_p), x_s], dim=1)
+        elif self.use_share and self.use_private and self.con_pri_shd:
             x = torch.cat([x_p, x_s], dim=1)
         elif self.use_share:
             x = x_s
