@@ -80,7 +80,7 @@ def set_grads(net, save_grads, task_id, num_mini_tasks):
         if n in save_grads:
             p.grad = save_grads[n]/num_mini_tasks
 
-def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
+def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use_only_share):
     net.train()
     for e in range(epochs):
         correct, loss = 0.0, 0.0
@@ -90,7 +90,7 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device):
             inputs = batch[0].to(device)
             labels = batch[1].to(device)
 
-            outs = net(inputs.clone(), inputs.clone(), task_id)
+            outs = net(inputs.clone(), inputs.clone(), task_id, use_only_share)
             _, preds = outs.max(1)
 
             l = criterion(outs, labels) 
@@ -188,7 +188,7 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
         for n in g:
             save_grads[n] += g[n]*weights[i]/args.mini_tasks
     #Ponderacion
-    return save_grads, total_loss, loss_mini_task
+    return save_grads, total_loss, loss_mini_task, np.mean(grads_acc['acc'])
 
 def train(args, net, task_id, dataloader, criterion, device):
     opti_shar = getOptimizer(args.shad_meta, args.priv_meta, args.head_meta, net, args.lr_meta, task_id)
@@ -211,7 +211,7 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], 3*args.pri_epochs, task_id, device, True)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
@@ -222,8 +222,8 @@ def train(args, net, task_id, dataloader, criterion, device):
 
     for i in range(args.out_epochs):
         if args.mini_tasks > 0:
-            save_grads, total_loss, loss_mini_task = train_mini_task(args, net, dataloader, task_id, criterion, device)
-            print("Train: Total loss: {} \t Mini Task Loss: {}".format(total_loss/args.mini_tasks,loss_mini_task/args.mini_tasks))
+            save_grads, total_loss, loss_mini_task, acc = train_mini_task(args, net, dataloader, task_id, criterion, device)
+            print("Train: Total loss: {} \t Mini Task Loss: {} \t Acc: {}".format(total_loss/args.mini_tasks,loss_mini_task/args.mini_tasks, acc))
             results['meta_loss'].append(total_loss/args.mini_tasks)
             results['mini_loss'].append(loss_mini_task/args.mini_tasks)
 
@@ -238,7 +238,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler_shar.step(total_loss)
 
         if i % args.val_iter == 0:
-            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
             results['train_loss'].append(res_train[1])
             results['train_acc'].append(res_train[0])
 
@@ -254,7 +254,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler_priv.step(res_test[1])
             net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
@@ -288,8 +288,9 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         'train_loss': [],
         'train_acc': []
     }
+    use_only_share = True
     for i in range(args.out_epochs):
-        res_train = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device)
+        res_train = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device, use_only_share)
         results['train_loss'].append(res_train[1])
         results['train_acc'].append(res_train[0])
 
@@ -305,6 +306,9 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
 
         scheduler.step(res_test[1])
         net.load_state_dict(copy.deepcopy(best_model).state_dict())
+
+        if i > args.out_epochs/2:
+            use_only_share = False
 
     return results
 
