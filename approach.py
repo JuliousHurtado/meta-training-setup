@@ -211,7 +211,7 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], 3*args.pri_epochs, task_id, device, True)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
@@ -288,7 +288,7 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         'train_loss': [],
         'train_acc': []
     }
-    use_only_share = True
+    use_only_share = False
     for i in range(args.out_epochs):
         res_train = train_dataset(net, opti_total, criterion, dataloader['train'], 1, task_id, device, use_only_share)
         results['train_loss'].append(res_train[1])
