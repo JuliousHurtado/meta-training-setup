@@ -6,7 +6,7 @@
 import torch
 import numpy as np
 
-# from regularization import MaskRegularization, DiffRegularization
+from .regularization import MaskRegularization, DiffRegularization
 
 def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
     return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
@@ -68,7 +68,6 @@ class Shared(torch.nn.Module):
         # h = self.drop2(self.bn6(self.relu(self.fc3(h))))
         # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
-
 
 class Private(torch.nn.Module):
     def __init__(self, args, hiddens, layers):
@@ -138,8 +137,6 @@ class Private(torch.nn.Module):
 
         return m, x
 
-
-
 class Net(torch.nn.Module):
 
     def __init__(self, args, device):
@@ -170,9 +167,9 @@ class Net(torch.nn.Module):
         else:
             raise NotImplementedError
 
-        # self.regs = []
-        # if args.mask_reg:
-        #     self.regs.append(MaskRegularization(args.mask_theta))
+        self.regs = []
+        if args.mask_reg:
+            self.regs.append(MaskRegularization(args.mask_theta))
 
         # if args.diff_reg:
         #     self.regs.append(DiffRegularization(args.diff_theta))
@@ -231,7 +228,12 @@ class Net(torch.nn.Module):
             x = x_s
         else:
             x = x_p
-        return self.head[task_id](x)
+
+        loss = 0
+        for reg in self.regs:
+            loss += reg(m_p)
+
+        return self.head[task_id](x), loss
 
     def print_model_size(self):
         if self.use_private:

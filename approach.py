@@ -90,10 +90,10 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use
             inputs = batch[0].to(device)
             labels = batch[1].to(device)
 
-            outs = net(inputs.clone(), inputs.clone(), task_id, use_only_share)
+            outs, loss_reg = net(inputs.clone(), inputs.clone(), task_id, use_only_share)
             _, preds = outs.max(1)
 
-            l = criterion(outs, labels) 
+            l = criterion(outs, labels) + loss_reg
             l.backward()
 
             opti.step()
@@ -118,7 +118,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
         if opti is not None:
             opti.zero_grad()
 
-        outs = net(inputs.clone(), inputs.clone(), task_id, True)
+        outs, _ = net(inputs.clone(), inputs.clone(), task_id, True)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.view_as(preds)).sum().item()
@@ -320,7 +320,7 @@ def test(net, task_id, dataloader, criterion, device):
         inputs = batch[0].to(device)
         labels = batch[1].to(device)
 
-        outs = net(inputs.clone(), inputs.clone(), task_id)
+        outs, _ = net(inputs.clone(), inputs.clone(), task_id)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
