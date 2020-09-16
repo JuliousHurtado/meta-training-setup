@@ -25,11 +25,11 @@ class Shared(torch.nn.Module):
         self.conv1=torch.nn.Conv2d(self.ncha,hiddens[0],kernel_size=k_size[0])
         s=compute_conv_output_size(size,k_size[0])
         s=s//2
-        self.bn1 = torch.nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
+        #self.bn1 = torch.nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
         self.conv2=torch.nn.Conv2d(hiddens[0],hiddens[1],kernel_size=k_size[1])
         s=compute_conv_output_size(s,k_size[1])
         s=s//2
-        self.bn2 = torch.nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
+        #self.bn2 = torch.nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
         self.conv3=torch.nn.Conv2d(hiddens[1],hiddens[2],kernel_size=k_size[2])
         s=compute_conv_output_size(s,k_size[2])
         s=s//2
@@ -40,9 +40,9 @@ class Shared(torch.nn.Module):
         # self.drop1=torch.nn.Dropout(0.2)
         self.drop2=torch.nn.Dropout(0.5)
         self.fc1=torch.nn.Linear(hiddens[2]*s*s,hiddens[3])
-        self.bn4=torch.nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
+        #self.bn4=torch.nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
         self.fc2=torch.nn.Linear(hiddens[3],self.latent_dim)
-        self.bn5=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
+        #self.bn5=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
         # self.fc3=torch.nn.Linear(hiddens[4],hiddens[5])
         # self.bn6=torch.nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
         # self.fc4=torch.nn.Linear(hiddens[5], self.latent_dim)
@@ -53,18 +53,23 @@ class Shared(torch.nn.Module):
         if len(x_s.size()) == 2:
             x_s = x_s.view(x_s.size(0), 1, 28, 28)
 
-        h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
+        #h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
+        h = self.maxpool(self.relu(self.conv1(x_s)))
         if mask:
             h = h * mask[0]
-        h = self.maxpool(self.relu(self.bn2(self.conv2(h))))
+        #h = self.maxpool(self.relu(self.bn2(self.conv2(h))))
+        h = self.maxpool(self.relu(self.conv2(h)))
         if mask:
             h = h * mask[1]
-        h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
+        #h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
+        h = self.maxpool(self.relu(self.conv3(h)))
         if mask:
             h = h * mask[2]
         h = h.view(x_s.size(0), -1)
-        h = self.drop2(self.relu(self.bn4(self.fc1(h))))
-        h = self.drop2(self.bn5(self.relu(self.fc2(h))))
+        #h = self.drop2(self.relu(self.bn4(self.fc1(h))))
+        #h = self.drop2(self.relu(self.bn4(self.fc2(h))))
+        h = self.drop2(self.relu(self.fc1(h)))
+        h = self.drop2(self.relu(self.fc2(h)))
         # h = self.drop2(self.bn6(self.relu(self.fc3(h))))
         # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
