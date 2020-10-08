@@ -5,13 +5,15 @@
 
 import torch
 import numpy as np
+import torch.nn as nn
+import torchvision.models as models
 
 from .regularization import MaskRegularization, DiffRegularization
 
 def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
     return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
 
-class Shared(torch.nn.Module):
+class Shared(nn.Module):
 
     def __init__(self,args, hiddens):
         super(Shared, self).__init__()
@@ -22,31 +24,31 @@ class Shared(torch.nn.Module):
 
         k_size = [size//8, size//10, 2]
 
-        self.conv1=torch.nn.Conv2d(self.ncha,hiddens[0],kernel_size=k_size[0])
+        self.conv1=nn.Conv2d(self.ncha,hiddens[0],kernel_size=k_size[0])
         s=compute_conv_output_size(size,k_size[0])
         s=s//2
-        #self.bn1 = torch.nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
-        self.conv2=torch.nn.Conv2d(hiddens[0],hiddens[1],kernel_size=k_size[1])
+        #self.bn1 = nn.BatchNorm2d(hiddens[0], affine=True, track_running_stats=False)
+        self.conv2=nn.Conv2d(hiddens[0],hiddens[1],kernel_size=k_size[1])
         s=compute_conv_output_size(s,k_size[1])
         s=s//2
-        #self.bn2 = torch.nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
-        self.conv3=torch.nn.Conv2d(hiddens[1],hiddens[2],kernel_size=k_size[2])
+        #self.bn2 = nn.BatchNorm2d(hiddens[1], affine=True, track_running_stats=False)
+        self.conv3=nn.Conv2d(hiddens[1],hiddens[2],kernel_size=k_size[2])
         s=compute_conv_output_size(s,k_size[2])
         s=s//2
-        self.bn3 = torch.nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
-        self.maxpool=torch.nn.MaxPool2d(2)
-        self.relu=torch.nn.ReLU()
+        self.bn3 = nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
+        self.maxpool=nn.MaxPool2d(2)
+        self.relu=nn.ReLU()
 
-        # self.drop1=torch.nn.Dropout(0.2)
-        self.drop2=torch.nn.Dropout(0.5)
-        self.fc1=torch.nn.Linear(hiddens[2]*s*s,hiddens[3])
-        #self.bn4=torch.nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
-        self.fc2=torch.nn.Linear(hiddens[3],self.latent_dim)
-        #self.bn5=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
-        # self.fc3=torch.nn.Linear(hiddens[4],hiddens[5])
-        # self.bn6=torch.nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
-        # self.fc4=torch.nn.Linear(hiddens[5], self.latent_dim)
-        # self.bn7=torch.nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
+        # self.drop1=nn.Dropout(0.2)
+        self.drop2=nn.Dropout(0.5)
+        self.fc1=nn.Linear(hiddens[2]*s*s,hiddens[3])
+        #self.bn4=nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
+        self.fc2=nn.Linear(hiddens[3],self.latent_dim)
+        #self.bn5=nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
+        # self.fc3=nn.Linear(hiddens[4],hiddens[5])
+        # self.bn6=nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
+        # self.fc4=nn.Linear(hiddens[5], self.latent_dim)
+        # self.bn7=nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
 
     def forward(self, x_s, mask):
         # print(x_s.size())
@@ -56,15 +58,15 @@ class Shared(torch.nn.Module):
         #h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
         h = self.maxpool(self.relu(self.conv1(x_s)))
         if mask:
-            h = h * mask[0]
+            h = h * mask[0][0]# + mask[0][1]
         #h = self.maxpool(self.relu(self.bn2(self.conv2(h))))
         h = self.maxpool(self.relu(self.conv2(h)))
         if mask:
-            h = h * mask[1]
+            h = h * mask[1][0]# + mask[1][1]
         #h = self.maxpool(self.relu(self.bn3(self.conv3(h))))
         h = self.maxpool(self.relu(self.conv3(h)))
         if mask:
-            h = h * mask[2]
+            h = h * mask[2][0]# + mask[2][1]
         h = h.view(x_s.size(0), -1)
         #h = self.drop2(self.relu(self.bn4(self.fc1(h))))
         #h = self.drop2(self.relu(self.bn4(self.fc2(h))))
@@ -74,7 +76,7 @@ class Shared(torch.nn.Module):
         # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
 
-class Private(torch.nn.Module):
+class Private(nn.Module):
     def __init__(self, args, hiddens, layers):
         super(Private, self).__init__()
 
@@ -88,37 +90,37 @@ class Private(torch.nn.Module):
         hiddens = [ int(h/2) for h in hiddens ]
         hiddens.insert(0, self.ncha)
 
-        self.conv = torch.nn.ModuleList()
-        self.linear = torch.nn.ModuleList()
-        self.last_em = torch.nn.ModuleList()
+        self.conv = nn.ModuleList()
+        self.linear = nn.ModuleList()
+        self.last_em = nn.ModuleList()
         for i in range(self.num_tasks):
-            conv = torch.nn.ModuleList()
-            linear = torch.nn.ModuleList()
+            conv = nn.ModuleList()
+            linear = nn.ModuleList()
 
             s = self.size
             for j in range(self.layers):
-                layer = torch.nn.Sequential()
-                layer.add_module('conv{}'.format(j+1), torch.nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
-                layer.add_module('bn{}'.format(j+1), torch.nn.BatchNorm2d(hiddens[j+1]))
-                #layer.add_module('drop{}'.format(j+1), torch.nn.Dropout(0.2))
-                layer.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
-                layer.add_module('maxpool{}'.format(j+1), torch.nn.MaxPool2d(2))
+                layer = nn.Sequential()
+                layer.add_module('conv{}'.format(j+1), nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
+                layer.add_module('bn{}'.format(j+1), nn.BatchNorm2d(hiddens[j+1]))
+                #layer.add_module('drop{}'.format(j+1), nn.Dropout(0.2))
+                layer.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
+                layer.add_module('maxpool{}'.format(j+1), nn.MaxPool2d(2))
                 conv.append(layer)
 
-                mask_lin = torch.nn.Sequential()
-                mask_lin.add_module('linear{}'.format(j+1), torch.nn.Linear(hiddens[j+1],hiddens[j+1]*2))
-                mask_lin.add_module('relu{}'.format(j+1), torch.nn.ReLU(inplace=True))
-                mask_lin.add_module('sigmoid{}'.format(j+1), torch.nn.Sigmoid())
+                mask_lin = nn.Sequential()
+                mask_lin.add_module('linear{}'.format(j+1), nn.Linear(hiddens[j+1],hiddens[j+1]*2))
+                mask_lin.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
+                mask_lin.add_module('sigmoid{}'.format(j+1), nn.Sigmoid())
                 linear.append(mask_lin)
 
                 s=compute_conv_output_size(s,k_size[j])
                 s=s//2
 
-            last_em = torch.nn.Sequential(
-                                torch.nn.Linear(hiddens[j+1]*s*s, self.latent_dim),
-                                torch.nn.BatchNorm1d(self.latent_dim),
-                                torch.nn.ReLU(inplace=True), 
-                                torch.nn.Dropout(0.5),
+            last_em = nn.Sequential(
+                                nn.Linear(hiddens[j+1]*s*s, self.latent_dim),
+                                nn.BatchNorm1d(self.latent_dim),
+                                nn.ReLU(inplace=True), 
+                                nn.Dropout(0.5),
                     )
 
             self.conv.append(conv)
@@ -142,13 +144,79 @@ class Private(torch.nn.Module):
 
         return m, x
 
-class Net(torch.nn.Module):
+class PrivateResnet(nn.Module):
+    def __init__(self, args, hiddens, layers, ):
+        super(PrivateResnet, self).__init__()
+
+        resnet18 = models.resnet18(pretrained=True)
+        modules = list(resnet18.children())[:-1]
+        self.feat_extraction = nn.Sequential(*modules)
+        for p in self.feat_extraction.parameters():
+            p.requires_grad = False
+
+        self.layers = layers
+        self.num_ftrs = resnet18.fc.in_features
+        self.hiddens = hiddens
+        #self.hiddens = np.cumsum(hiddens)
+
+        self.linear = nn.ModuleList()
+        for i in range(args.ntasks):
+            linear = nn.ModuleList()
+            for j in range(self.layers):
+                # mask_lin = nn.Sequential(
+                #             nn.Linear(self.num_ftrs,int(self.num_ftrs/2)),
+                #             nn.BatchNorm1d(int(self.num_ftrs/2)),
+                #             nn.ReLU(inplace=True),
+                #             nn.Dropout(0.5),
+                #             nn.Linear(int(self.num_ftrs/2),hiddens[j]),
+                #             nn.ReLU(inplace=True),
+                #             nn.Dropout(0.5),
+                #             #nn.Sigmoid()
+                #         )
+                mask_lin = nn.Sequential(
+                                nn.Linear(self.num_ftrs, hiddens[j]),
+                                #nn.BatchNorm1d(2*hiddens[j]),
+                                #nn.ReLU(inplace=True),
+                                #nn.Dropout(0.5),
+                            )
+                linear.append(mask_lin)
+            # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
+            # linear.append(mask_lin)
+            self.linear.append(linear)
+
+    def forward(self, x, task_id):
+        m = []
+
+        if len(x.size()) == 2:
+            x = x.view(x.size(0), 1, 224, 224)
+
+        x = self.feat_extraction(x).squeeze()
+        for i in range(self.layers):
+            film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
+            m.append([
+                film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
+                #film_vector[:,1,:].unsqueeze(2).unsqueeze(3),
+                ])
+        # film_vector = self.linear[task_id][0](x.clone()).view(
+        #     x.size(0), -1, self.hiddens[-1])
+        # m.append([
+        #         film_vector[:,0,:self.hiddens[0]].unsqueeze(2).unsqueeze(3),
+        #         film_vector[:,1,:self.hiddens[0]].unsqueeze(2).unsqueeze(3),
+        #         ])
+        # for i in range(1,self.layers):
+        #     m.append([
+        #         film_vector[:,0,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
+        #         film_vector[:,1,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
+        #         ])
+
+        return m, x
+
+class Net(nn.Module):
 
     def __init__(self, args, device):
         super(Net, self).__init__()
         self.ncha,size,_=args.inputsize
         self.taskcla=args.taskcla
-        self.latent_dim = args.latent_dim
         self.num_tasks = args.ntasks
         self.image_size = self.ncha*size*size
         self.args=args
@@ -184,7 +252,8 @@ class Net(torch.nn.Module):
         if args.use_share:
             self.shared = Shared(args, hiddens)
         if args.use_private:
-            self.private = Private(args, hiddens, 3)
+            #self.private = Private(args, hiddens, 3)
+            self.private = PrivateResnet(args, hiddens, 3)
 
         self.con_pri_shd = args.con_pri_shd
         self.use_share = args.use_share
@@ -192,22 +261,23 @@ class Net(torch.nn.Module):
         self.use_mask = args.use_mask
         # self.diff_pri_shar = args.diff_pri_shar
 
-        factor = 1
+        self.latent_dim = args.latent_dim
         if self.con_pri_shd:
-            factor = 2
+            #self.latent_dim *= 2
+            self.latent_dim = args.latent_dim + self.private.num_ftrs
 
-        self.head = torch.nn.ModuleList()
+        self.head = nn.ModuleList()
         for i in range(self.num_tasks):
             self.head.append(
-                torch.nn.Sequential(
-                    torch.nn.Linear(factor*self.latent_dim, self.hidden1),
-                    torch.nn.BatchNorm1d(self.hidden1),
-                    torch.nn.ReLU(inplace=True),
-                    torch.nn.Dropout(),
-                    torch.nn.Linear(self.hidden1, self.hidden2),
-                    torch.nn.BatchNorm1d(self.hidden2),
-                    torch.nn.ReLU(inplace=True),
-                    torch.nn.Linear(self.hidden2, self.taskcla[i][1])
+                nn.Sequential(
+                    nn.Linear(self.latent_dim, self.hidden1),
+                    nn.BatchNorm1d(self.hidden1),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(),
+                    nn.Linear(self.hidden1, self.hidden2),
+                    nn.BatchNorm1d(self.hidden2),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(self.hidden2, self.taskcla[i][1])
                 ))
 
 
@@ -216,6 +286,8 @@ class Net(torch.nn.Module):
             m_p, x_p = self.private(x_p, task_id)
         else:
             m_p = None
+
+        #m_p = [ [torch.ones_like(m[0]),torch.ones_like(m[1])] for m in m_p ]
 
         if not self.use_mask:
             m_p = None
@@ -235,8 +307,9 @@ class Net(torch.nn.Module):
             x = x_p
 
         loss = 0
-        for reg in self.regs:
-            loss += reg(m_p)
+        # FIX
+        # for reg in self.regs:
+        #     loss += reg(m_p)
 
         return self.head[task_id](x), loss
 

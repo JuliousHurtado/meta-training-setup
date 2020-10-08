@@ -26,7 +26,8 @@ from utils import *
 
 class iCIFAR10(datasets.CIFAR10):
 
-    def __init__(self, root, classes, memory_classes, memory, task_num, train, transform=None, target_transform=None, download=True):
+    def __init__(self, root, classes, memory_classes, memory, task_num, train, transform=None, target_transform=None, 
+                                    transform_feats=None, download=True):
 
         super(iCIFAR10, self).__init__(root, transform=transform,
                                       target_transform=target_transform, download=True)
@@ -36,6 +37,8 @@ class iCIFAR10(datasets.CIFAR10):
 
         self.class_mapping = {c: i for i, c in enumerate(classes)}
         self.class_indices = {}
+
+        self.transform_feats = transform_feats
 
         for cls in classes:
             self.class_indices[self.class_mapping[cls]] = []
@@ -120,7 +123,7 @@ class iCIFAR10(datasets.CIFAR10):
 
         try:
             if self.transform is not None:
-                img = self.transform(img)
+                img_org = self.transform(img)
         except:
             pass
         try:
@@ -129,7 +132,13 @@ class iCIFAR10(datasets.CIFAR10):
         except:
             pass
 
-        return img, target, tt, td
+        try:
+            if self.transform_feats is not None:
+                img_feats = self.transform_feats(img)
+        except:
+            pass
+
+        return img_org, target, img_feats
 
 
 
@@ -188,6 +197,10 @@ class DatasetGen(object):
         std=[x/255 for x in [63.0,62.1,66.7]]
 
         self.transformation = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
+        self.transformation_feats = transforms.Compose([transforms.Resize(256),
+                                        transforms.CenterCrop(224), 
+                                        transforms.ToTensor(), 
+                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
         self.taskcla = [[t, int(self.num_classes/self.num_tasks)] for t in range(self.num_tasks)]
 
@@ -231,10 +244,11 @@ class DatasetGen(object):
             memory = self.task_memory
 
         self.train_set[task_id] = iCIFAR100(root=self.root, classes=self.task_ids[task_id], memory_classes=memory_classes,
-                                            memory=memory, task_num=task_id, train=True, download=True, transform=self.transformation)
+                                            memory=memory, task_num=task_id, train=True, download=True, transform=self.transformation,
+                                            transform_feats=self.transformation_feats)
         self.test_set[task_id] = iCIFAR100(root=self.root, classes=self.task_ids[task_id], memory_classes=None,
                                            memory=None, task_num=task_id, train=False,
-                                     download=True, transform=self.transformation)
+                                     download=True, transform=self.transformation, transform_feats=self.transformation_feats)
 
 
 

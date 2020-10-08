@@ -61,7 +61,7 @@ class CIFAR10_(datasets.CIFAR10):
     }
     num_classes = 10
 
-    def __init__(self, root, task_num, num_samples_per_class, train, transform, target_transform=None, download=True):
+    def __init__(self, root, task_num, num_samples_per_class, train, transform, , transform_feats, target_transform=None, download=True):
         # root, task_num, train, transform = None, download = False):
         super(CIFAR10_, self).__init__(root, task_num, transform=transform,
                                         target_transform=target_transform,
@@ -72,6 +72,7 @@ class CIFAR10_(datasets.CIFAR10):
         self.train = train  # training set or test set
         self.transform = transform
         self.target_transform=target_transform
+        self.transform_feats = transform_feats
 
         if download:
             self.download()
@@ -145,7 +146,7 @@ class CIFAR10_(datasets.CIFAR10):
             pass
 
         try:
-            if self.transform is not None: img = self.transform(img)
+            if self.transform is not None: img_org = self.transform(img)
         except:
             pass
         try:
@@ -154,7 +155,13 @@ class CIFAR10_(datasets.CIFAR10):
         except:
             pass
 
-        return img, target, tt, td
+        try:
+            if self.transform_feats is not None:
+                img_feats = self.transform_feats(img)
+        except:
+            pass
+
+        return img_org, target, img_feats
 
 
 
@@ -219,7 +226,7 @@ class SVHN_(torch.utils.data.Dataset):
                   "extra_32x32.mat", "a93ce644f1a588dc4d68dda5feec44a7"]}
 
 
-    def __init__(self, root, task_num, num_samples_per_class, train,transform=None, target_transform=None, download=True):
+    def __init__(self, root, task_num, num_samples_per_class, train, transform=None, transform_feats=None, target_transform=None, download=True):
         self.root = os.path.expanduser(root)
         # root, task_num, train, transform = None, download = False):
         # print(self.train)
@@ -228,6 +235,7 @@ class SVHN_(torch.utils.data.Dataset):
         self.train = train  # training set or test set
         self.transform = transform
         self.target_transform=target_transform
+        self.transform_feats = transform_feats
 
         if self.train:
             split="train"
@@ -311,7 +319,7 @@ class SVHN_(torch.utils.data.Dataset):
             pass
 
         try:
-            if self.transform is not None: img = self.transform(img)
+            if self.transform is not None: img_org = self.transform(img)
         except:
             pass
         try:
@@ -320,7 +328,13 @@ class SVHN_(torch.utils.data.Dataset):
         except:
             pass
 
-        return img, target, tt, td
+        try:
+            if self.transform_feats is not None:
+                img_feats = self.transform_feats(img)
+        except:
+            pass
+
+        return img_org, target, img_feats
 
 
     def __len__(self):
@@ -342,13 +356,15 @@ class SVHN_(torch.utils.data.Dataset):
 
 class MNIST_RGB(datasets.MNIST):
 
-    def __init__(self, root, task_num, num_samples_per_class, train=True, transform=None, target_transform=None, download=False):
+    def __init__(self, root, task_num, num_samples_per_class, train=True, transform=None, transform_feats=None, target_transform=None, download=False):
         super(MNIST_RGB, self).__init__(root, task_num, transform=transform,
                                         target_transform=target_transform,
                                         download=download)
         self.train = train  # training set or test set
         self.target_transform=target_transform
         self.transform=transform
+        self.transform_feats = transform_feats
+
         self.num_classes=10
         if download:
             self.download()
@@ -406,7 +422,7 @@ class MNIST_RGB(datasets.MNIST):
             pass
 
         try:
-            if self.transform is not None: img = self.transform(img)
+            if self.transform is not None: img_org = self.transform(img)
         except:
             pass
         try:
@@ -415,7 +431,13 @@ class MNIST_RGB(datasets.MNIST):
         except:
             pass
 
-        return img, target, tt, td
+        try:
+            if self.transform_feats is not None:
+                img_feats = self.transform_feats(img)
+        except:
+            pass
+
+        return img_org, target, img_feats
 
 
 
@@ -489,10 +511,11 @@ class FashionMNIST_(MNIST_RGB):
 
 class notMNIST_(torch.utils.data.Dataset):
 
-    def __init__(self, root, task_num, num_samples_per_class, train,transform=None, target_transform=None, download=False):
+    def __init__(self, root, task_num, num_samples_per_class, train,transform=None, transform_feats=None, target_transform=None, download=False):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform=target_transform
+        self.transform_feats = transform_feats
         self.train = train
 
         self.url = "https://github.com/facebookresearch/Adversarial-Continual-Learning/raw/master/data/notMNIST.zip"
@@ -561,9 +584,12 @@ class notMNIST_(torch.utils.data.Dataset):
         img, target, tt, td = self.data[index], self.targets[index], self.tt[index], self.td[index]
 
         img = Image.fromarray(img)#.convert('RGB')
-        img = self.transform(img)
+        img_org = self.transform(img)
 
-        return img, target, tt, td
+        if self.transform_feats is not None:
+            img_feats = self.transform_feats(img)
+
+        return img_org, target, img_feats
 
     def __len__(self):
         return len(self.data)

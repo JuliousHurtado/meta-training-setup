@@ -10,14 +10,20 @@ def getOptimizer(shared, private, head, net, lr, task_id):
     params = []
 
     if private:
-        for p in net.private.conv[task_id].parameters():
-            params.append(p)
+        try:
+            for p in net.private.conv[task_id].parameters():
+                params.append(p)
+        except:
+            pass
 
         for p in net.private.linear[task_id].parameters():
             params.append(p)
 
-        for p in net.private.last_em[task_id].parameters():
-            params.append(p)
+        try:
+            for p in net.private.last_em[task_id].parameters():
+                params.append(p)
+        except:
+            pass
 
     if head:
         for p in net.head[task_id].parameters():
@@ -37,6 +43,14 @@ def init_grads_out(net):
 
     return grads
 
+def get_diff_weights(old_net, new_net):
+    grads = {}
+
+    for (_,p_new),(n,p_old) in zip(new_net.named_parameters(), old_net.named_parameters()):
+        grads[n] = p_new - p_old
+
+    return grads 
+
 def print_sum_params(net, task_id):
     s = 0
     for n,p in net.shared.named_parameters():
@@ -44,14 +58,20 @@ def print_sum_params(net, task_id):
     print("Shared: ",s)
 
     s = 0
-    for n,p in net.private.conv[task_id].named_parameters():
-        s += p.sum()
+    try:
+        for n,p in net.private.conv[task_id].named_parameters():
+            s += p.sum()
+    except:
+        pass
 
     for n,p in net.private.linear[task_id].named_parameters():
         s += p.sum()
 
-    for n,p in net.private.last_em[task_id].named_parameters():
-        s += p.sum()
+    try:
+        for n,p in net.private.last_em[task_id].named_parameters():
+            s += p.sum()
+    except:
+        pass
     print("Private: ",s)
     
     s = 0
@@ -63,18 +83,23 @@ def set_grads(net, save_grads, task_id, num_mini_tasks):
     for n,p in enumerate(net.shared.named_parameters()):
         if n in save_grads:
             p.grad = save_grads[n]/num_mini_tasks
-
-    for n,p in net.private.conv[task_id].named_parameters():
-        if n in save_grads:
-            p.grad = save_grads[n]/num_mini_tasks
+    try:
+        for n,p in net.private.conv[task_id].named_parameters():
+            if n in save_grads:
+                p.grad = save_grads[n]/num_mini_tasks
+    except:
+        pass
 
     for n,p in net.private.linear[task_id].named_parameters():
         if n in save_grads:
             p.grad = save_grads[n]/num_mini_tasks
 
-    for n,p in net.private.last_em[task_id].named_parameters():
-        if n in save_grads:
-            p.grad = save_grads[n]/num_mini_tasks
+    try:
+        for n,p in net.private.last_em[task_id].named_parameters():
+            if n in save_grads:
+                p.grad = save_grads[n]/num_mini_tasks
+    except:
+        pass
 
     for n,p in net.head[task_id].named_parameters():
         if n in save_grads:
@@ -89,8 +114,9 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use
             opti.zero_grad()
             inputs = batch[0].to(device)
             labels = batch[1].to(device)
+            inputs_feats = batch[2].to(device)
 
-            outs, loss_reg = net(inputs.clone(), inputs.clone(), task_id, use_only_share)
+            outs, loss_reg = net(inputs, inputs_feats, task_id, use_only_share)
             _, preds = outs.max(1)
 
             l = criterion(outs, labels) + loss_reg
@@ -105,24 +131,22 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use
 
     return correct/total, loss/len(dataloader)
 
-def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patience_inner, save_grad=None):
+def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_grad=None):
     running_loss = 0.0
-    best_loss = np.inf
-    best_model = copy.deepcopy(net)
-    patience = patience_inner
-    factor = 1
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
+    inputs_feats = batch[2].to(device)
+    scheduler = optim.lr_scheduler.StepLR(opti, step_size=15, gamma=0.5)
     for _ in range(inner_loop):
         if opti is not None:
             opti.zero_grad()
 
-        outs, _ = net(inputs.clone(), inputs.clone(), task_id, True)
+        outs, _ = net(inputs.clone(), inputs_feats.clone(), task_id, True)
         _, preds = torch.max(outs, 1)
 
-        correct = preds.eq(labels.view_as(preds)).sum().item()
-        l = criterion(outs, labels)
+        correct = preds.eq(labels.clone().view_as(preds)).sum().item()
+        l = criterion(outs, labels.clone())
         l.backward()
 
         if type(save_grad) == dict:
@@ -137,22 +161,12 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, patien
 
         else:
             opti.step()
+            #scheduler.step()
 
+        #print("Loss: {}\t Correct:{}\t Total:{}".format(l.item(),correct,inputs.size(0)))
         running_loss = l.item()
 
-        if l.item() < best_loss:
-            best_loss = l.item()
-            best_model = copy.deepcopy(net)
-        else:
-            patience -= 1
-            if patience <= 0:
-                factor *= 0.5
-                for param_group in opti.param_groups:
-                    param_group['lr'] = param_group['lr']*factor
-                
-        net.load_state_dict(copy.deepcopy(best_model).state_dict())
-
-    return running_loss
+    return running_loss, correct/inputs.size(0)
 
 def train_mini_task(args, net, dataloader, task_id, criterion, device):
     iter_data_train = iter(dataloader['train'])
@@ -171,22 +185,26 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
             iter_data_train = iter(dataloader['train'])
             batch = next(iter_data_train)
 
-        loss_mini_task += train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device, args.lr_patience_inner) 
-
-        for k in range(args.mini_tests):
-            try:
-                batch = next(iter_data_val)
-            except:
-                iter_data_val = iter(dataloader['train'])
-                batch = next(iter_data_val)
-
-            total_loss += train_batch(t_net, None, criterion, batch, 1, task_id, device, args.lr_patience_inner, grads_acc)
+        temp_loss, acc_mini = train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device) 
+        loss_mini_task += temp_loss
+        grads_acc['grads'].append(get_diff_weights(net, t_net))
+        grads_acc['acc'].append(acc_mini)
+        
+        # for k in range(args.mini_tests):
+        #     try:
+        #         batch = next(iter_data_val)
+        #     except:
+        #         iter_data_val = iter(dataloader['train'])
+        #         batch = next(iter_data_val)
+       
+        # temp_loss, _= train_batch(t_net, None, criterion, batch, 1, task_id, device, grads_acc)
+        # total_loss += temp_loss
 
     save_grads = init_grads_out(net)
     weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
     for i, g in enumerate(grads_acc['grads']):
         for n in g:
-            save_grads[n] += g[n]*weights[i]/args.mini_tasks
+            save_grads[n] += g[n]*weights[i]/args.inner_loop
     #Ponderacion
     return save_grads, total_loss, loss_mini_task, np.mean(grads_acc['acc'])
 
@@ -250,9 +268,11 @@ def train(args, net, task_id, dataloader, criterion, device):
             if res_test[1] < best_loss:
                 best_loss = res_test[1]
                 best_model = copy.deepcopy(net)
+            else:
+                net.load_state_dict(copy.deepcopy(best_model).state_dict())
+                opti_priv = getOptimizer(args.shad_task, args.priv_task, args.head_task, net, args.lr_task, task_id)
 
             scheduler_priv.step(res_test[1])
-            net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
     res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
     results['train_loss'].append(res_train[1])
@@ -265,8 +285,8 @@ def train(args, net, task_id, dataloader, criterion, device):
 
     if res_test[1] < best_loss:
         best_model = copy.deepcopy(net)
-
-    net.load_state_dict(copy.deepcopy(best_model).state_dict())
+    else:
+        net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
     return results
 
@@ -303,9 +323,11 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
         if res_test[1] < best_loss:
             best_loss = res_test[1]
             best_model = copy.deepcopy(net)
+        else:
+            net.load_state_dict(copy.deepcopy(best_model).state_dict())
+            opti_total = getOptimizer(args.use_share, args.use_private, True, net, args.lr_task, task_id)
 
         scheduler.step(res_test[1])
-        net.load_state_dict(copy.deepcopy(best_model).state_dict())
 
         if i > args.out_epochs/2:
             use_only_share = False
@@ -319,8 +341,9 @@ def test(net, task_id, dataloader, criterion, device):
     for i, batch in enumerate(dataloader):
         inputs = batch[0].to(device)
         labels = batch[1].to(device)
+        inputs_feats = batch[2].to(device)
 
-        outs, _ = net(inputs.clone(), inputs.clone(), task_id)
+        outs, _ = net(inputs, inputs_feats, task_id)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
