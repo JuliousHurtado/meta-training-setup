@@ -161,7 +161,7 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_g
 
         else:
             opti.step()
-            #scheduler.step()
+            scheduler.step()
 
         #print("Loss: {}\t Correct:{}\t Total:{}".format(l.item(),correct,inputs.size(0)))
         running_loss = l.item()
@@ -229,7 +229,7 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, True)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
@@ -256,7 +256,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler_shar.step(total_loss)
 
         if i % args.val_iter == 0:
-            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
+            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, True)
             results['train_loss'].append(res_train[1])
             results['train_acc'].append(res_train[0])
 
