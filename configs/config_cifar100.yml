@@ -41,6 +41,11 @@ pri_mini: True
 shd_task: False
 pri_task: True
 
+use_share: True
+con_pri_shd: True
+use_private: True
+use_mask: True
+
 lr_meta: 0.01
 lr_mini: 0.1
 lr_task: 0.01
