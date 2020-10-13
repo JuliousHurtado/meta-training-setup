@@ -191,14 +191,20 @@ class DatasetGen(object):
 
         self.num_samples = args.samples
 
+        if args.resnet18:
+            self.size_private = 256
+            self.crop_private = 224
+        else:
+            self.size_private = 32
+            self.crop_private = 28
 
         self.inputsize = [3,32,32]
         mean=[x/255 for x in [125.3,123.0,113.9]]
         std=[x/255 for x in [63.0,62.1,66.7]]
 
         self.transformation = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
-        self.transformation_feats = transforms.Compose([transforms.Resize(256),
-                                        transforms.CenterCrop(224), 
+        self.transformation_feats = transforms.Compose([transforms.Resize(self.size_private),
+                                        transforms.CenterCrop(self.crop_private), 
                                         transforms.ToTensor(), 
                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
