@@ -148,41 +148,54 @@ class PrivateResnet(nn.Module):
     def __init__(self, args, hiddens, layers, ):
         super(PrivateResnet, self).__init__()
 
-        resnet18 = models.resnet18(pretrained=True)
-        modules = list(resnet18.children())[:-1]
-        self.feat_extraction = nn.Sequential(*modules)
-        for p in self.feat_extraction.parameters():
-            p.requires_grad = False
-
+        self.use_resnet = args.resnet18
         self.layers = layers
-        self.num_ftrs = resnet18.fc.in_features
         self.hiddens = hiddens
-        #self.hiddens = np.cumsum(hiddens)
 
+        if self.use_resnet:
+            resnet18 = models.resnet18(pretrained=True)
+            modules = list(resnet18.children())[:-1]
+            self.feat_extraction = nn.Sequential(*modules)
+            for p in self.feat_extraction.parameters():
+                p.requires_grad = False
+
+            self.num_ftrs = resnet18.fc.in_features
+            
+        else:
+            self.ncha,self.size,_=args.inputsize
+            hiddens = [ int(h/2) for h in hiddens ]
+            hiddens.insert(0, self.ncha)
+            k_size = [self.size//8, self.size//10, 2]
+
+            self.conv = nn.ModuleList()
+            for i in range(args.ntasks):
+                s = self.size
+                layer = nn.Sequential()
+                for j in range(self.layers):
+                    layer.add_module('conv{}'.format(j+1), nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
+                    layer.add_module('bn{}'.format(j+1), nn.BatchNorm2d(hiddens[j+1]))
+                    layer.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
+                    layer.add_module('maxpool{}'.format(j+1), nn.MaxPool2d(2))
+                    #conv.append(layer)
+
+                    s=compute_conv_output_size(s,k_size[j])
+                    s=s//2
+
+                self.conv.append(layer)
+                self.num_ftrs = hiddens[j+1]*s*s
+
+        self.mask = nn.ModuleList()
         self.linear = nn.ModuleList()
         for i in range(args.ntasks):
             linear = nn.ModuleList()
             for j in range(self.layers):
-                # mask_lin = nn.Sequential(
-                #             nn.Linear(self.num_ftrs,int(self.num_ftrs/2)),
-                #             nn.BatchNorm1d(int(self.num_ftrs/2)),
-                #             nn.ReLU(inplace=True),
-                #             nn.Dropout(0.5),
-                #             nn.Linear(int(self.num_ftrs/2),hiddens[j]),
-                #             nn.ReLU(inplace=True),
-                #             nn.Dropout(0.5),
-                #             #nn.Sigmoid()
-                #         )
                 mask_lin = nn.Sequential(
-                                nn.Linear(self.num_ftrs, hiddens[j]),
-                                #nn.BatchNorm1d(2*hiddens[j]),
-                                #nn.ReLU(inplace=True),
-                                #nn.Dropout(0.5),
+                                nn.Linear(self.num_ftrs, self.hiddens[j]),
                             )
                 linear.append(mask_lin)
             # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
-            # linear.append(mask_lin)
-            self.linear.append(linear)
+            self.linear.append(nn.Linear(self.num_ftrs, args.latent_dim))
+            self.mask.append(linear)
 
     def forward(self, x, task_id):
         m = []
@@ -190,12 +203,15 @@ class PrivateResnet(nn.Module):
         if len(x.size()) == 2:
             x = x.view(x.size(0), 1, 224, 224)
 
-        x = self.feat_extraction(x).squeeze()
+        if self.use_resnet:
+            x = self.feat_extraction(x).squeeze()
+        else:
+            x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
+
         for i in range(self.layers):
-            film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
+            film_vector = self.mask[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
             m.append([
                 film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
-                #film_vector[:,1,:].unsqueeze(2).unsqueeze(3),
                 ])
         # film_vector = self.linear[task_id][0](x.clone()).view(
         #     x.size(0), -1, self.hiddens[-1])
@@ -208,6 +224,8 @@ class PrivateResnet(nn.Module):
         #         film_vector[:,0,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
         #         film_vector[:,1,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
         #         ])
+
+        x = self.linear[task_id](x)
 
         return m, x
 
@@ -226,16 +244,16 @@ class Net(nn.Module):
 
 
         if args.experiment == 'cifar100':
-            hiddens = [64, 128, 256, 1024, 1024, 512]
+            hiddens = [64, 128, 256, 512]
 
         elif args.experiment == 'miniimagenet':
-            hiddens = [64, 128, 256, 512, 512, 512]
+            hiddens = [64, 128, 256, 512]
 
         elif args.experiment == 'multidatasets':
-            hiddens = [64, 128, 256, 1024, 1024, 512]
+            hiddens = [64, 128, 256, 512]
 
         elif args.experiment == 'mnist5' or args.experiment == 'pmnist':
-            hiddens = [32, 64, 128, 256, 256, 256]
+            hiddens = [32, 64, 128, 256]
 
         else:
             raise NotImplementedError
@@ -263,8 +281,7 @@ class Net(nn.Module):
 
         self.latent_dim = args.latent_dim
         if self.con_pri_shd:
-            #self.latent_dim *= 2
-            self.latent_dim = args.latent_dim + self.private.num_ftrs
+            self.latent_dim *= 2
 
         self.head = nn.ModuleList()
         for i in range(self.num_tasks):
@@ -316,22 +333,32 @@ class Net(nn.Module):
     def print_model_size(self):
         if self.use_private:
             count_P = sum(p.numel() for p in self.private.parameters() if p.requires_grad)
+            if self.private.use_resnet:
+                count_pre_train = sum(p.numel() for p in self.private.feat_extraction.parameters())
+            else:
+                count_pre_train = 0
         else:
             count_P = 0
+            count_pre_train = 0
         if self.use_share:
             count_S = sum(p.numel() for p in self.shared.parameters() if p.requires_grad)
         else:
             count_S = 0
         count_H = sum(p.numel() for p in self.head.parameters() if p.requires_grad)
 
-        print('Num parameters in S       = %s ' % (self.pretty_print(count_S)))
-        print('Num parameters in P       = %s,  per task = %s ' % (self.pretty_print(count_P),self.pretty_print(count_P/self.num_tasks)))
-        print('Num parameters in p       = %s,  per task = %s ' % (self.pretty_print(count_H),self.pretty_print(count_H/self.num_tasks)))
-        print('Num parameters in P+p    = %s ' % self.pretty_print(count_P+count_H))
+        print('Num parameters in S \t = %s ' % (self.pretty_print(count_S)))
+        print('Num parameters in P \t = %s,  per task = %s ' % (self.pretty_print(count_P),self.pretty_print(count_P/self.num_tasks)))
+        print('Num parameters in p \t = %s,  per task = %s ' % (self.pretty_print(count_H),self.pretty_print(count_H/self.num_tasks)))
+        print('Num parameters in P+p \t = %s ' % self.pretty_print(count_P+count_H))
         print('-------------------------->   Architecture size: %s parameters (%sB)' % (self.pretty_print(count_S + count_P + count_H),
                                                                     self.pretty_print(4*(count_S + count_P + count_H))))
         print("------------------------------------------------------------------------------")
         print("                               TOTAL:  %sB" % self.pretty_print(4*(count_S + count_P + count_H)))
+        print("------------------------------------------------------------------------------")
+        print('Num parameters in Pre-train \t = %s ' % self.pretty_print(count_pre_train))
+        print("                               Parameters: \t %s" % self.pretty_print((count_S + count_P + count_H + count_pre_train)))
+        print("                               New TOTAL: \t %sB" % self.pretty_print(4*(count_S + count_P + count_H + count_pre_train)))
+        print("------------------------------------------------------------------------------")
 
     def pretty_print(self, num):
         magnitude=0
