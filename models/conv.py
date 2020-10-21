@@ -184,8 +184,8 @@ class PrivateResnet(nn.Module):
                 self.conv.append(layer)
                 self.num_ftrs = hiddens[j+1]*s*s
 
-        self.mask = nn.ModuleList()
         self.linear = nn.ModuleList()
+        self.last_em = nn.ModuleList()
         for i in range(args.ntasks):
             linear = nn.ModuleList()
             for j in range(self.layers):
@@ -194,8 +194,14 @@ class PrivateResnet(nn.Module):
                             )
                 linear.append(mask_lin)
             # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
-            self.linear.append(nn.Linear(self.num_ftrs, args.latent_dim))
-            self.mask.append(linear)
+            self.last_em.append(nn.Sequential(
+                        nn.Linear(self.num_ftrs, args.latent_dim),
+                        nn.ReLU(),
+                        nn.Dropout(0.5),
+                        nn.Linear(args.latent_dim, args.latent_dim),
+                        nn.ReLU(),
+                        nn.Dropout(0.5)))
+            self.linear.append(linear)
 
     def forward(self, x, task_id):
         m = []
@@ -209,7 +215,7 @@ class PrivateResnet(nn.Module):
             x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
 
         for i in range(self.layers):
-            film_vector = self.mask[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
+            film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
             m.append([
                 film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
                 ])
@@ -225,7 +231,7 @@ class PrivateResnet(nn.Module):
         #         film_vector[:,1,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
         #         ])
 
-        x = self.linear[task_id](x)
+        x = self.last_em[task_id](x)
 
         return m, x
 
@@ -315,8 +321,11 @@ class Net(nn.Module):
             x_s = self.shared(x_s, m_p)
         
         if use_only_share:
+            x_s = torch.nn.functional.normalize(x_s, dim=1)
             x = torch.cat([torch.zeros_like(x_p), x_s], dim=1)
         elif self.use_share and self.use_private and self.con_pri_shd:
+            x_s = torch.nn.functional.normalize(x_s, dim=1)
+            x_p = torch.nn.functional.normalize(x_p, dim=1)
             x = torch.cat([x_p, x_s], dim=1)
         elif self.use_share:
             x = x_s

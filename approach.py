@@ -6,7 +6,7 @@ from torch import optim
 
 
 
-def getOptimizer(shared, private, head, net, lr, task_id):
+def getOptimizer(shared, private, private_lin, head, net, lr, task_id):
     params = []
 
     if private:
@@ -19,11 +19,9 @@ def getOptimizer(shared, private, head, net, lr, task_id):
         for p in net.private.linear[task_id].parameters():
             params.append(p)
 
-        try:
-            for p in net.private.last_em[task_id].parameters():
-                params.append(p)
-        except:
-            pass
+    if private_lin:
+        for p in net.private.last_em[task_id].parameters():
+            params.append(p)
 
     if head:
         for p in net.head[task_id].parameters():
@@ -131,13 +129,14 @@ def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use
 
     return correct/total, loss/len(dataloader)
 
-def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_grad=None):
+def train_batch(net, opti, criterion, batch, inner_loop, task_id, device):
     running_loss = 0.0
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
     inputs_feats = batch[2].to(device)
-    scheduler = optim.lr_scheduler.StepLR(opti, step_size=15, gamma=0.5)
+    if opti is not None:
+        scheduler = optim.lr_scheduler.StepLR(opti, step_size=15, gamma=0.5)
     for _ in range(inner_loop):
         if opti is not None:
             opti.zero_grad()
@@ -146,25 +145,17 @@ def train_batch(net, opti, criterion, batch, inner_loop, task_id, device, save_g
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
-        l = criterion(outs, labels.clone())
-        l.backward()
 
-        if type(save_grad) == dict:
-            save_grad['acc'].append(correct/inputs.size(0))
+        if criterion is not None:
+            l = criterion(outs, labels.clone())
+            l.backward()
+            
+            #print("Loss: {}\t Correct:{}\t Total:{}".format(l.item(),correct,inputs.size(0)))
+            running_loss = l.item()
 
-            local_grad = init_grads_out(net)
-            for name, param in net.named_parameters():
-                if param.grad is not None:
-                    local_grad[name] = param.grad.clone()
-
-            save_grad['grads'].append(local_grad)
-
-        else:
+        if opti is not None:
             opti.step()
             scheduler.step()
-
-        #print("Loss: {}\t Correct:{}\t Total:{}".format(l.item(),correct,inputs.size(0)))
-        running_loss = l.item()
 
     return running_loss, correct/inputs.size(0)
 
@@ -177,7 +168,7 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     total_loss = 0.0
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net)
-        opti_priv = getOptimizer(args.shad_mini, args.priv_mini, args.head_mini, t_net, args.lr_mini, task_id)
+        opti_priv = getOptimizer(args.shad_mini, args.priv_mini, False, args.head_mini, t_net, args.lr_mini, task_id)
 
         try:
             batch = next(iter_data_train)
@@ -188,17 +179,15 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
         temp_loss, acc_mini = train_batch(t_net, opti_priv, criterion, batch, args.inner_loop, task_id, device) 
         loss_mini_task += temp_loss
         grads_acc['grads'].append(get_diff_weights(net, t_net))
-        grads_acc['acc'].append(acc_mini)
         
-        # for k in range(args.mini_tests):
-        #     try:
-        #         batch = next(iter_data_val)
-        #     except:
-        #         iter_data_val = iter(dataloader['train'])
-        #         batch = next(iter_data_val)
+        try:
+            batch = next(iter_data_val)
+        except:
+            iter_data_val = iter(dataloader['train'])
+            batch = next(iter_data_val)
        
-        # temp_loss, _= train_batch(t_net, None, criterion, batch, 1, task_id, device, grads_acc)
-        # total_loss += temp_loss
+        _, acc_mini= train_batch(t_net, None, None, batch, 1, task_id, device)
+        grads_acc['acc'].append(acc_mini)
 
     save_grads = init_grads_out(net)
     weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
@@ -209,11 +198,11 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     return save_grads, total_loss, loss_mini_task, np.mean(grads_acc['acc'])
 
 def train(args, net, task_id, dataloader, criterion, device):
-    opti_shar = getOptimizer(args.shad_meta, args.priv_meta, args.head_meta, net, args.lr_meta, task_id)
+    opti_shar = getOptimizer(args.shad_meta, args.priv_meta, False, args.head_meta, net, args.lr_meta, task_id)
     scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_shar, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
-    opti_priv = getOptimizer(args.shad_task, args.priv_task, args.head_task, net, args.lr_task, task_id)
+    opti_priv = getOptimizer(args.shad_task, args.priv_task, False, args.head_task, net, args.lr_task, task_id)
     scheduler_priv = optim.lr_scheduler.ReduceLROnPlateau(opti_priv, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
@@ -270,11 +259,12 @@ def train(args, net, task_id, dataloader, criterion, device):
                 best_model = copy.deepcopy(net)
             else:
                 net.load_state_dict(copy.deepcopy(best_model).state_dict())
-                opti_priv = getOptimizer(args.shad_task, args.priv_task, args.head_task, net, args.lr_task, task_id)
+                opti_priv = getOptimizer(args.shad_task, args.priv_task, False, args.head_task, net, args.lr_task, task_id)
 
             scheduler_priv.step(res_test[1])
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
+    opti_priv = getOptimizer(False, False, True, True, net, args.lr_task, task_id)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs*5, task_id, device, False)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
