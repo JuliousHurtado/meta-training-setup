@@ -245,7 +245,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler_shar.step(total_loss)
 
         if i % args.val_iter == 0:
-            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, True)
+            res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
             results['train_loss'].append(res_train[1])
             results['train_acc'].append(res_train[0])
 
@@ -264,7 +264,7 @@ def train(args, net, task_id, dataloader, criterion, device):
             scheduler_priv.step(res_test[1])
 
     opti_priv = getOptimizer(False, False, True, True, net, args.lr_task, task_id)
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs*5, task_id, device, False)
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs*3, task_id, device, False)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
