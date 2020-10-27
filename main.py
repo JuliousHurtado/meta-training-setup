@@ -11,7 +11,7 @@ import torch.utils.data.distributed
 import utils
 
 from models.conv import Net
-from approach import train, test, trainAll 
+from approach import train, test, trainAll, prueba
 
 def run(args, run_id):
     # Args -- Experiment
@@ -65,10 +65,12 @@ def run(args, run_id):
         if args.experiment == 'multidatasets':
             args.lr_task = dataloader.lrs[t][1]
         # Train
-        if args.train_first and (t == 0 or not (args.use_share and args.use_private)):
-            res_task = trainAll(args, net, t, dataset[t], criterion, device)
-        else:
-            res_task = train(args, net, t, dataset[t], criterion, device)
+        #if args.train_first and (t == 0 or not (args.use_share and args.use_private)):
+        #    res_task = trainAll(args, net, t, dataset[t], criterion, device)
+        #else:
+        #    res_task = train(args, net, t, dataset[t], criterion, device)
+        
+        res_task = prueba(args, net, t, dataset[t], criterion, device)
         total_res[t] = res_task
         print('-'*150)
         print()
