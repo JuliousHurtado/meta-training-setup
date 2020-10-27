@@ -10,11 +10,11 @@ def getOptimizer(shared, private, private_lin, head, net, lr, task_id):
     params = []
 
     if private:
-        try:
-            for p in net.private.conv[task_id].parameters():
-                params.append(p)
-        except:
-            pass
+        # try:
+        #     for p in net.private.conv[task_id].parameters():
+        #         params.append(p)
+        # except:
+        #     pass
 
         for p in net.private.linear[task_id].parameters():
             params.append(p)
@@ -77,31 +77,31 @@ def print_sum_params(net, task_id):
         s += p.sum()
     print("Head: ",s)
 
-def set_grads(net, save_grads, task_id, num_mini_tasks):
+def set_grads(net, save_grads, task_id):
     for n,p in enumerate(net.shared.named_parameters()):
         if n in save_grads:
-            p.grad = save_grads[n]/num_mini_tasks
+            p.grad = save_grads[n]
     try:
         for n,p in net.private.conv[task_id].named_parameters():
             if n in save_grads:
-                p.grad = save_grads[n]/num_mini_tasks
+                p.grad = save_grads[n]
     except:
         pass
 
     for n,p in net.private.linear[task_id].named_parameters():
         if n in save_grads:
-            p.grad = save_grads[n]/num_mini_tasks
+            p.grad = save_grads[n]
 
     try:
         for n,p in net.private.last_em[task_id].named_parameters():
             if n in save_grads:
-                p.grad = save_grads[n]/num_mini_tasks
+                p.grad = save_grads[n]
     except:
         pass
 
     for n,p in net.head[task_id].named_parameters():
         if n in save_grads:
-            p.grad = save_grads[n]/num_mini_tasks
+            p.grad = save_grads[n]
 
 def train_dataset(net, opti, criterion, dataloader, epochs, task_id, device, use_only_share):
     net.train()
@@ -198,11 +198,12 @@ def train_mini_task(args, net, dataloader, task_id, criterion, device):
     return save_grads, total_loss, loss_mini_task, np.mean(grads_acc['acc'])
 
 def train(args, net, task_id, dataloader, criterion, device):
-    opti_shar = getOptimizer(args.shad_meta, args.priv_meta, False, args.head_meta, net, args.lr_meta, task_id)
-    scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_shar, mode='min', 
+    if args.use_share:
+        opti_shar = getOptimizer(args.shad_meta, args.priv_meta, False, args.head_meta, net, args.lr_meta, task_id)
+        scheduler_shar = optim.lr_scheduler.ReduceLROnPlateau(opti_shar, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
-    opti_priv = getOptimizer(args.shad_task, args.priv_task, False, args.head_task, net, args.lr_task, task_id)
+    opti_priv = getOptimizer(args.shad_task, args.priv_task, True, args.head_task, net, args.lr_task, task_id)
     scheduler_priv = optim.lr_scheduler.ReduceLROnPlateau(opti_priv, mode='min', 
                     factor=0.5, patience=args.lr_patience, min_lr=1e-5, eps=1e-08)
 
@@ -218,7 +219,9 @@ def train(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
 
-    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, True)
+    train_features(args, net, dataloader, task_id, criterion, device)
+
+    res_train = train_dataset(net, opti_priv, criterion, dataloader['train'], args.pri_epochs, task_id, device, False)
     results['train_loss'].append(res_train[1])
     results['train_acc'].append(res_train[0])
 
@@ -259,7 +262,7 @@ def train(args, net, task_id, dataloader, criterion, device):
                 best_model = copy.deepcopy(net)
             else:
                 net.load_state_dict(copy.deepcopy(best_model).state_dict())
-                opti_priv = getOptimizer(args.shad_task, args.priv_task, False, args.head_task, net, args.lr_task, task_id)
+                opti_priv = getOptimizer(args.shad_task, args.priv_task, True, args.head_task, net, args.lr_task, task_id)
 
             scheduler_priv.step(res_test[1])
 
@@ -281,8 +284,10 @@ def train(args, net, task_id, dataloader, criterion, device):
     return results
 
 def trainAll(args, net, task_id, dataloader, criterion, device):
+    train_features(args, net, dataloader['train'], task_id, criterion, device)
+
     net.train()
-    opti_total = getOptimizer(args.use_share, args.use_private, True, net, args.lr_task, task_id)
+    opti_total = getOptimizer(args.use_share, args.use_private, True, True, net, args.lr_task, task_id)
 
     best_loss = np.inf
     best_model = copy.deepcopy(net)
@@ -315,7 +320,7 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
             best_model = copy.deepcopy(net)
         else:
             net.load_state_dict(copy.deepcopy(best_model).state_dict())
-            opti_total = getOptimizer(args.use_share, args.use_private, True, net, args.lr_task, task_id)
+            opti_total = getOptimizer(args.use_share, args.use_private, True, True, net, args.lr_task, task_id)
 
         scheduler.step(res_test[1])
 
@@ -323,6 +328,60 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
             use_only_share = False
 
     return results
+
+
+
+def train_features(args, net, dataloader, task_id, criterion, device):
+    params = []
+
+    for p in net.private.conv[task_id].parameters():
+        params.append(p)
+
+    clfs = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
+    for p in clfs.parameters():
+        params.append(p)
+
+    opti = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+
+    for e in range(args.feats_epochs):
+        correct, loss = 0.0, 0.0
+        total = 0
+        for i, batch in enumerate(dataloader['train']):
+            opti.zero_grad()
+            inputs = batch[0].to(device)
+            labels = batch[1].to(device)
+            inputs_feats = batch[2].to(device)
+
+            outs = net.private.conv[task_id](inputs).view(inputs.size(0),-1)
+            outs = clfs(outs)
+            _, preds = outs.max(1)
+
+            l = criterion(outs, labels)
+            l.backward()
+
+            opti.step()
+
+            correct += preds.eq(labels.view_as(preds)).sum().item()
+            loss += l.item()
+
+            total += inputs.size(0)
+
+    correct_test = 0.0
+    total_test = 0
+    for i, batch in enumerate(dataloader['valid']):
+        inputs = batch[0].to(device)
+        labels = batch[1].to(device)
+        inputs_feats = batch[2].to(device)
+        outs = net.private.conv[task_id](inputs).view(inputs.size(0),-1)
+        outs = clfs(outs)
+        _, preds = outs.max(1)
+        correct_test += preds.eq(labels.view_as(preds)).sum().item()
+        total_test += inputs.size(0)
+
+    print("Feature Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss/len(dataloader), correct/total, correct_test/total_test))
+
+    for p in net.private.conv[task_id].parameters():
+        p.requires_grad = False
 
 def test(net, task_id, dataloader, criterion, device):
     net.eval()
@@ -333,7 +392,8 @@ def test(net, task_id, dataloader, criterion, device):
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        outs, _ = net(inputs, inputs_feats, task_id)
+        #outs, _ = net(inputs, inputs_feats, task_id)
+        outs, _ = net.forward2(inputs, task_id)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
@@ -344,3 +404,140 @@ def test(net, task_id, dataloader, criterion, device):
         total += inputs.size(0)
 
     return correct/total, loss/len(dataloader)
+
+def trainPrueba(net, task_id, loader, opti, criterion, device):
+    correct, loss = 0.0, 0.0
+    total = 0
+
+    for i, batch in enumerate(loader):
+        opti.zero_grad()
+        inputs = batch[0].to(device)
+        labels = batch[1].to(device)
+        inputs_feats = batch[2].to(device)
+
+        outs, reg_loss = net.forward2(inputs, task_id)
+        _, preds = outs.max(1)
+        l = criterion(outs, labels) + reg_loss*0.01
+        l.backward()
+
+        opti.step()
+
+        correct += preds.eq(labels.view_as(preds)).sum().item()
+        loss += l.item()
+
+        total += inputs.size(0)
+
+    return correct/total, loss/len(loader)
+
+def trainBatchPrueba(net, opti, criterion, batch, inner_loop, task_id, device):
+    running_loss = 0.0
+    net.train()
+    inputs = batch[0].to(device)
+    labels = batch[1].to(device)
+    inputs_feats = batch[2].to(device)
+
+    if opti is not None:
+        scheduler = optim.lr_scheduler.StepLR(opti, step_size=15, gamma=0.5)
+
+    for _ in range(inner_loop):
+        if opti is not None:
+            opti.zero_grad()
+
+        outs, _ = net.forward2(inputs, task_id)
+        _, preds = torch.max(outs, 1)
+
+        correct = preds.eq(labels.clone().view_as(preds)).sum().item()
+
+        if criterion is not None:
+            l = criterion(outs, labels.clone())
+            l.backward()
+            
+            running_loss = l.item()
+
+        if opti is not None:
+            opti.step()
+            scheduler.step()
+
+    return running_loss, correct/inputs.size(0)
+
+def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
+    grads_acc = {'grads': [], 'acc': []}
+    loss_mini_task = 0.0
+    total_loss = 0.0
+    for k in range(args.mini_tasks):
+        t_net = copy.deepcopy(net)
+        opti_shared_task = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, t_net, args.lr_meta, task_id)
+        
+        try:
+            batch = next(iter_data_train)
+        except:
+            iter_data_train = iter(loader)
+            batch = next(iter_data_train)
+
+        temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, device) 
+        loss_mini_task += temp_loss
+        grads_acc['grads'].append(get_diff_weights(net, t_net))
+        
+        try:
+            batch = next(iter_data_val)
+        except:
+            iter_data_val = iter(loader)
+            batch = next(iter_data_val)
+       
+        _, acc_mini= trainBatchPrueba(t_net, None, None, batch, 1, task_id, device)
+        grads_acc['acc'].append(acc_mini)
+
+    save_grads = init_grads_out(net)
+    weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
+    for i, g in enumerate(grads_acc['grads']):
+        for n in g:
+            save_grads[n] += g[n]/(args.inner_loop+args.mini_tasks)
+
+    set_grads(net, save_grads, task_id)
+    opti_shared.step()
+    opti_shared.zero_grad()
+
+    return np.mean(grads_acc['acc'])
+
+def prueba(args, net, task_id, dataloader, criterion, device):
+    results = {
+        'meta_loss': [],
+        'meta_acc': [],
+        'val_loss': [],
+        'val_acc': [],
+        'train_loss': [],
+        'train_acc': []
+    }
+
+    train_features(args, net, dataloader, task_id, criterion, device)
+
+    opti = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
+    opti_shared = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, net, args.lr_meta, task_id)
+
+    best_loss = np.inf
+    best_model = copy.deepcopy(net)
+
+    for e in range(args.epochs):
+        if args.use_meta:
+            meta_acc = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        else:
+            res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
+
+        for _ in range(args.epochs_inner_task):
+            res_train = trainPrueba(net, task_id, dataloader['train'], opti, criterion, device)
+
+        res_test = test(net, task_id, dataloader['valid'], criterion, device)
+
+        print("[{}|{}]Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f} \t Meta Acc: {:.4f}".format(e+1,args.epochs,res_train[1], res_train[0], res_test[0], meta_acc))
+
+        results['train_loss'].append(res_train[1])
+        results['train_acc'].append(res_train[0])
+        results['val_acc'].append(res_test[0])
+        results['meta_acc'].append(meta_acc)
+
+        if res_test[1] < best_loss:
+            best_loss = res_test[1]
+            best_model = copy.deepcopy(net)
+        else:
+            net.load_state_dict(copy.deepcopy(best_model).state_dict())
+            opti_priv = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)

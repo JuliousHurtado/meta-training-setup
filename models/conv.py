@@ -35,7 +35,7 @@ class Shared(nn.Module):
         self.conv3=nn.Conv2d(hiddens[1],hiddens[2],kernel_size=k_size[2])
         s=compute_conv_output_size(s,k_size[2])
         s=s//2
-        self.bn3 = nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
+        #self.bn3 = nn.BatchNorm2d(hiddens[2], affine=True, track_running_stats=False)
         self.maxpool=nn.MaxPool2d(2)
         self.relu=nn.ReLU()
 
@@ -85,6 +85,7 @@ class Private(nn.Module):
         self.latent_dim = args.latent_dim
         self.num_tasks = args.ntasks
         self.layers = layers
+        self.use_resnet = args.resnet18
 
         k_size = [self.size//8, self.size//10, 2]
         hiddens = [ int(h/2) for h in hiddens ]
@@ -109,8 +110,8 @@ class Private(nn.Module):
 
                 mask_lin = nn.Sequential()
                 mask_lin.add_module('linear{}'.format(j+1), nn.Linear(hiddens[j+1],hiddens[j+1]*2))
-                mask_lin.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
-                mask_lin.add_module('sigmoid{}'.format(j+1), nn.Sigmoid())
+                #mask_lin.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
+                #mask_lin.add_module('sigmoid{}'.format(j+1), nn.Sigmoid())
                 linear.append(mask_lin)
 
                 s=compute_conv_output_size(s,k_size[j])
@@ -118,7 +119,7 @@ class Private(nn.Module):
 
             last_em = nn.Sequential(
                                 nn.Linear(hiddens[j+1]*s*s, self.latent_dim),
-                                nn.BatchNorm1d(self.latent_dim),
+                                #nn.BatchNorm1d(self.latent_dim),
                                 nn.ReLU(inplace=True), 
                                 nn.Dropout(0.5),
                     )
@@ -153,7 +154,7 @@ class PrivateResnet(nn.Module):
         self.hiddens = hiddens
 
         if self.use_resnet:
-            resnet18 = models.resnet18(pretrained=True)
+            resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
             modules = list(resnet18.children())[:-1]
             self.feat_extraction = nn.Sequential(*modules)
             for p in self.feat_extraction.parameters():
@@ -191,6 +192,8 @@ class PrivateResnet(nn.Module):
             for j in range(self.layers):
                 mask_lin = nn.Sequential(
                                 nn.Linear(self.num_ftrs, self.hiddens[j]),
+                                nn.ReLU(),
+                                nn.Dropout(0.25),
                             )
                 linear.append(mask_lin)
             # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
@@ -198,9 +201,10 @@ class PrivateResnet(nn.Module):
                         nn.Linear(self.num_ftrs, args.latent_dim),
                         nn.ReLU(),
                         nn.Dropout(0.5),
-                        nn.Linear(args.latent_dim, args.latent_dim),
-                        nn.ReLU(),
-                        nn.Dropout(0.5)))
+                        #nn.Linear(args.latent_dim, args.latent_dim),
+                        #nn.ReLU(),
+                        #nn.Dropout(0.5)
+                        ))
             self.linear.append(linear)
 
     def forward(self, x, task_id):
@@ -294,11 +298,11 @@ class Net(nn.Module):
             self.head.append(
                 nn.Sequential(
                     nn.Linear(self.latent_dim, self.hidden1),
-                    nn.BatchNorm1d(self.hidden1),
+                    #nn.BatchNorm1d(self.hidden1),
                     nn.ReLU(inplace=True),
                     nn.Dropout(),
                     nn.Linear(self.hidden1, self.hidden2),
-                    nn.BatchNorm1d(self.hidden2),
+                    #nn.BatchNorm1d(self.hidden2),
                     nn.ReLU(inplace=True),
                     nn.Linear(self.hidden2, self.taskcla[i][1])
                 ))
@@ -319,6 +323,8 @@ class Net(nn.Module):
             #if self.diff_pri_shar:
             #    x_s = torch.cat((x_s[:int(x_p.size(0)/2)], x_s[int(x_p.size(0)/2):]))
             x_s = self.shared(x_s, m_p)
+        else:
+            x_s = torch.zeros_like(x_p)
         
         if use_only_share:
             x_s = torch.nn.functional.normalize(x_s, dim=1)
@@ -338,6 +344,24 @@ class Net(nn.Module):
         #     loss += reg(m_p)
 
         return self.head[task_id](x), loss
+
+    def forward2(self, x, task_id):
+        m_p, x_p = self.private(x.clone(), task_id)
+        #m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+        reg_loss = 0.0
+        # print("New")
+        for m in m_p:
+            #print(m[0].size())
+            #print(m[0].sum()/m[0].size(0))
+            #print( (m[0] > 0.01).sum()/m[0].size(0) )
+            reg_loss += m[0].abs().sum()/m[0].size(0)
+        x_s = self.shared(x.clone(), m_p)
+        #x_s = torch.zeros_like(x_p)
+        #x_p = torch.zeros_like(x_p)
+        x_s = torch.nn.functional.normalize(x_s, dim=1)
+        x_p = torch.nn.functional.normalize(x_p, dim=1)
+        x = torch.cat([x_p, x_s], dim=1)
+        return self.head[task_id](x), reg_loss
 
     def print_model_size(self):
         if self.use_private:
