@@ -42,11 +42,11 @@ classes_datasets = {
 }
 
 lr_datasets = {
-    'CIFAR10': 0.001,
+    'CIFAR10': 0.01,
     'notMNIST': 0.01,
-    'MNIST': 0.01,
+    'MNIST': 0.1,
     'SVHN': 0.001,
-    'FashionMNIST': 0.01,
+    'FashionMNIST': 0.1,
 
 }
 
