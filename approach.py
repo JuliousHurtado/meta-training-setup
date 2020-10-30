@@ -647,7 +647,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.01, momentum=0.9) # 
     #opti_shared = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, net, args.lr_meta, task_id)
-    for e in range(args.epochs):
+    for e in range(args.meta_epochs):
         #res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
         #meta_acc = res_train[0]
         meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
