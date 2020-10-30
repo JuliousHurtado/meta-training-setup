@@ -456,8 +456,8 @@ def trainBatchPrueba(net, opti, criterion, batch, inner_loop, task_id, device):
         if criterion is not None:
             l = criterion(outs, labels.clone())
             l.backward()
-            torch.nn.utils.clip_grad_norm_(net.shared.parameters(),1.5)
-            torch.nn.utils.clip_grad_norm_(net.shared_clf.parameters(),1.5)
+            torch.nn.utils.clip_grad_norm_(net.shared.parameters(),0.5)
+            torch.nn.utils.clip_grad_norm_(net.shared_clf.parameters(),0.5)
             running_loss = l.item()
 
         if opti is not None:
@@ -475,14 +475,14 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
         t_net.shared_clf = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
 
         params = []
-        #for p in t_net.private.linear.parameters():
-        #    params.append(p)
+        for p in t_net.private.linear.parameters():
+            params.append(p)
         for p in t_net.shared.parameters():
             params.append(p)
         for p in t_net.shared_clf.parameters():
             params.append(p)
 
-        opti_shared_task = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.01, momentum=0.9)
+        opti_shared_task = optim.SGD(params, args.lr_meta, weight_decay=0.1, momentum=0.9)
         # opti_shared_task = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, t_net, args.lr_meta, task_id)
         
         try:
@@ -519,7 +519,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
     return np.mean(grads_acc['acc']), loss_mini_task/args.mini_tasks
 
 def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward, device):
-    for e in range(args.epochs):
+    for e in range(args.feats_epochs):
         correct = 0.0
         total = 0.0
         for i, batch in enumerate(loader):
@@ -538,7 +538,7 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
             correct += preds.eq(labels.clone().view_as(preds)).sum().item()
             total += inputs.size(0)
 
-        print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.epochs,correct/total))
+    print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.epochs,correct/total))
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0
@@ -645,7 +645,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
     #     params.append(p)
     for p in net.shared.parameters():
         params.append(p)
-    opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.01, momentum=0.9) # 
+    opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
     #opti_shared = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, net, args.lr_meta, task_id)
     for e in range(args.meta_epochs):
         #res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
@@ -663,6 +663,8 @@ def prueba(args, net, task_id, dataloader, criterion, device):
     for p in net.private.last_em[task_id].parameters():
         params.append(p)
     for p in net.head[task_id].parameters():
+        params.append(p)
+    for p in net.private.linear[task_id].parameters():
         params.append(p)
     opti = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
     #opti = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
