@@ -41,11 +41,11 @@ class Shared(nn.Module):
 
         # self.drop1=nn.Dropout(0.2)
         self.drop2=nn.Dropout(0.5)
-        self.fc1=nn.Linear(hiddens[2]*s*s,hiddens[3])
+        self.fc1=nn.Linear(hiddens[2]*s*s,self.latent_dim)
         #self.bn4=nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
-        self.fc2=nn.Linear(hiddens[3],self.latent_dim)
+        #self.fc2=nn.Linear(hiddens[3],self.latent_dim)
         #self.bn5=nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
-        # self.fc3=nn.Linear(hiddens[4],hiddens[5])
+        #self.fc3=nn.Linear(hiddens[4],self.latent_dim)
         # self.bn6=nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
         # self.fc4=nn.Linear(hiddens[5], self.latent_dim)
         # self.bn7=nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
@@ -71,8 +71,8 @@ class Shared(nn.Module):
         #h = self.drop2(self.relu(self.bn4(self.fc1(h))))
         #h = self.drop2(self.relu(self.bn4(self.fc2(h))))
         h = self.drop2(self.relu(self.fc1(h)))
-        h = self.drop2(self.relu(self.fc2(h)))
-        # h = self.drop2(self.bn6(self.relu(self.fc3(h))))
+        #h = self.drop2(self.relu(self.fc2(h)))
+        #h = self.drop2(self.relu(self.fc3(h)))
         # h = self.drop2(self.bn7(self.relu(self.fc4(h))))
         return h
 
@@ -183,7 +183,8 @@ class PrivateResnet(nn.Module):
                     s=s//2
 
                 self.conv.append(layer)
-                self.num_ftrs = hiddens[j+1]*s*s
+                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+                self.num_ftrs = hiddens[j+1]#*s*s
 
         self.linear = nn.ModuleList()
         self.last_em = nn.ModuleList()
@@ -191,16 +192,18 @@ class PrivateResnet(nn.Module):
             linear = nn.ModuleList()
             for j in range(self.layers):
                 mask_lin = nn.Sequential(
-                                nn.Linear(self.num_ftrs, self.hiddens[j]),
+                                nn.Linear(self.num_ftrs, int(self.hiddens[j])),
+                                # nn.Linear(self.num_ftrs, int(self.hiddens[j]/2)),
                                 nn.ReLU(),
-                                nn.Dropout(0.25),
+                                # nn.Linear(int(self.hiddens[j]/2), self.hiddens[j]),
+                                #nn.Dropout(0.25),
                             )
                 linear.append(mask_lin)
             # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
             self.last_em.append(nn.Sequential(
                         nn.Linear(self.num_ftrs, args.latent_dim),
                         nn.ReLU(),
-                        nn.Dropout(0.5),
+                        #nn.Dropout(0.5),
                         #nn.Linear(args.latent_dim, args.latent_dim),
                         #nn.ReLU(),
                         #nn.Dropout(0.5)
@@ -216,7 +219,9 @@ class PrivateResnet(nn.Module):
         if self.use_resnet:
             x = self.feat_extraction(x).squeeze()
         else:
-            x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
+            x = self.conv[task_id](x)
+            x = self.avgpool(x).squeeze()
+            #x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
 
         for i in range(self.layers):
             film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
@@ -254,16 +259,16 @@ class Net(nn.Module):
 
 
         if args.experiment == 'cifar100':
-            hiddens = [64, 128, 256, 512]
+            hiddens = [64, 128, 256, 512, 512]
 
         elif args.experiment == 'miniimagenet':
-            hiddens = [64, 128, 256, 512]
+            hiddens = [64, 128, 256, 512, 512]
 
         elif args.experiment == 'multidatasets':
-            hiddens = [64, 128, 256, 512]
+            hiddens = [64, 128, 256, 512, 512]
 
         elif args.experiment == 'mnist5' or args.experiment == 'pmnist':
-            hiddens = [32, 64, 128, 256]
+            hiddens = [32, 64, 128, 256, 256]
 
         else:
             raise NotImplementedError
@@ -293,6 +298,7 @@ class Net(nn.Module):
         if self.con_pri_shd:
             self.latent_dim *= 2
 
+        self.drop = nn.Dropout(0.5)
         self.head = nn.ModuleList()
         for i in range(self.num_tasks):
             self.head.append(
@@ -349,19 +355,28 @@ class Net(nn.Module):
         m_p, x_p = self.private(x.clone(), task_id)
         #m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         reg_loss = 0.0
-        # print("New")
-        for m in m_p:
-            #print(m[0].size())
-            #print(m[0].sum()/m[0].size(0))
-            #print( (m[0] > 0.01).sum()/m[0].size(0) )
-            reg_loss += m[0].abs().sum()/m[0].size(0)
+        #for m in m_p:
+        #    reg_loss += m[0].abs().sum()/m[0].size(0)
         x_s = self.shared(x.clone(), m_p)
         #x_s = torch.zeros_like(x_p)
         #x_p = torch.zeros_like(x_p)
-        x_s = torch.nn.functional.normalize(x_s, dim=1)
-        x_p = torch.nn.functional.normalize(x_p, dim=1)
-        x = torch.cat([x_p, x_s], dim=1)
+        # x_s = torch.nn.functional.normalize(x_s, dim=1)
+        # x_p = torch.nn.functional.normalize(x_p, dim=1)
+        # x_s /= x_s.sum(dim=1).unsqueeze(1)
+        # x_p /= x_p.sum(dim=1).unsqueeze(1)
+        x = self.drop(torch.cat([x_p, x_s], dim=1))
         return self.head[task_id](x), reg_loss
+
+    def forward3(self, x, task_id):
+        m_p, x_p = self.private(x.clone(), task_id)
+        x_s = self.shared(x.clone(), m_p)
+        return self.shared_clf(x_s)
+
+    def forward4(self, x, task_id):
+        m_p, x_p = self.private(x.clone(), task_id)
+        m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+        x_s = self.shared(x.clone(), m_p)
+        return self.shared_clf(x_s)
 
     def print_model_size(self):
         if self.use_private:
