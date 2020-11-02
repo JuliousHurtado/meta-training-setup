@@ -336,8 +336,9 @@ def trainAll(args, net, task_id, dataloader, criterion, device):
 def train_features(args, net, dataloader, task_id, criterion, device):
     params = []
 
-    for p in net.private.conv[task_id].parameters():
-        params.append(p)
+    if not args.resnet18:
+        for p in net.private.conv[task_id].parameters():
+            params.append(p)
 
     clfs = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
     for p in clfs.parameters():
@@ -354,8 +355,11 @@ def train_features(args, net, dataloader, task_id, criterion, device):
             labels = batch[1].to(device)
             inputs_feats = batch[2].to(device)
 
-            outs = net.private.conv[task_id](inputs)#.view(inputs.size(0),-1)
-            outs = net.private.avgpool(outs).squeeze()
+            if args.resnet18:
+                outs = net.private.feat_extraction(inputs_feats).squeeze()
+            else:
+                outs = net.private.conv[task_id](inputs)#.view(inputs.size(0),-1)
+                outs = net.private.avgpool(outs).squeeze()
             outs = clfs(outs)
             _, preds = outs.max(1)
 
@@ -375,8 +379,11 @@ def train_features(args, net, dataloader, task_id, criterion, device):
         inputs = batch[0].to(device)
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
-        outs = net.private.conv[task_id](inputs)
-        outs = net.private.avgpool(outs).squeeze()
+        if args.resnet18:
+            outs = net.private.feat_extraction(inputs_feats).squeeze()
+        else:
+            outs = net.private.conv[task_id](inputs)
+            outs = net.private.avgpool(outs).squeeze()
         outs = clfs(outs)
         _, preds = outs.max(1)
         correct_test += preds.eq(labels.view_as(preds)).sum().item()
@@ -384,8 +391,9 @@ def train_features(args, net, dataloader, task_id, criterion, device):
 
     print("Feature Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss/len(dataloader), correct/total, correct_test/total_test))
 
-    for p in net.private.conv[task_id].parameters():
-        p.requires_grad = False
+    if not args.resnet18:
+        for p in net.private.conv[task_id].parameters():
+            p.requires_grad = False
 
 def test(net, task_id, dataloader, criterion, device):
     net.eval()
@@ -397,7 +405,7 @@ def test(net, task_id, dataloader, criterion, device):
         inputs_feats = batch[2].to(device)
 
         #outs, _ = net(inputs, inputs_feats, task_id)
-        outs, _ = net.forward2(inputs, task_id)
+        outs, _ = net.forward2(inputs, task_id, inputs_feats)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
@@ -419,7 +427,7 @@ def trainPrueba(net, task_id, loader, opti, criterion, device):
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        outs, reg_loss = net.forward2(inputs, task_id)
+        outs, reg_loss = net.forward2(inputs, task_id, inputs_feats)
         _, preds = outs.max(1)
         l = criterion(outs, labels) + reg_loss*0.01
         l.backward()
@@ -448,7 +456,7 @@ def trainBatchPrueba(net, opti, criterion, batch, inner_loop, task_id, device):
         if opti is not None:
             opti.zero_grad()
 
-        outs = net.forward3(inputs, task_id)
+        outs = net.forward3(inputs, task_id, inputs_feats)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
@@ -472,7 +480,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
     total_loss = 0.0
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net)
-        t_net.shared_clf = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
+        t_net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
 
         params = []
         for p in t_net.private.linear.parameters():
@@ -528,7 +536,7 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
             labels = batch[1].to(device)
             inputs_feats = batch[2].to(device)
 
-            outs = fun_forward(inputs, task_id)
+            outs = fun_forward(inputs, task_id, inputs_feats)
             _, preds = outs.max(1)
             l = criterion(outs, labels)
             l.backward()
@@ -538,7 +546,7 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
             correct += preds.eq(labels.clone().view_as(preds)).sum().item()
             total += inputs.size(0)
 
-    print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.epochs,correct/total))
+    print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0
@@ -586,7 +594,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
 
 
     if task_id >= 0:
-        net.shared_clf = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
+        net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
         params = []
         for p in net.shared.parameters():
             params.append(p)
@@ -622,7 +630,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
 
     # printSum(net, task_id)
 
-    net.shared_clf = torch.nn.Linear(net.private.num_ftrs, net.taskcla[task_id][1]).to(device)
+    net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
     params = []
     for p in net.private.linear[task_id].parameters():
         params.append(p)
@@ -651,7 +659,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         #res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
         #meta_acc = res_train[0]
         meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
-        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.epochs,meta_acc, meta_loss))
+        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
 
 
 
