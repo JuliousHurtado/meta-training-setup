@@ -152,6 +152,7 @@ class PrivateResnet(nn.Module):
         self.use_resnet = args.resnet18
         self.layers = layers
         self.hiddens = hiddens
+        self.dim_embedding = args.latent_dim
 
         if self.use_resnet:
             resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
@@ -201,7 +202,7 @@ class PrivateResnet(nn.Module):
                 linear.append(mask_lin)
             # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
             self.last_em.append(nn.Sequential(
-                        nn.Linear(self.num_ftrs, args.latent_dim),
+                        nn.Linear(self.num_ftrs, self.dim_embedding),
                         nn.ReLU(),
                         #nn.Dropout(0.5),
                         #nn.Linear(args.latent_dim, args.latent_dim),
@@ -351,8 +352,12 @@ class Net(nn.Module):
 
         return self.head[task_id](x), loss
 
-    def forward2(self, x, task_id):
-        m_p, x_p = self.private(x.clone(), task_id)
+    def forward2(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, x_p = self.private(x_p, task_id)
         #m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         reg_loss = 0.0
         #for m in m_p:
@@ -367,13 +372,21 @@ class Net(nn.Module):
         x = self.drop(torch.cat([x_p, x_s], dim=1))
         return self.head[task_id](x), reg_loss
 
-    def forward3(self, x, task_id):
-        m_p, x_p = self.private(x.clone(), task_id)
+    def forward3(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, x_p = self.private(x_p, task_id)
         x_s = self.shared(x.clone(), m_p)
         return self.shared_clf(x_s)
 
-    def forward4(self, x, task_id):
-        m_p, x_p = self.private(x.clone(), task_id)
+    def forward4(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, x_p = self.private(x_p, task_id)
         m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         x_s = self.shared(x.clone(), m_p)
         return self.shared_clf(x_s)
