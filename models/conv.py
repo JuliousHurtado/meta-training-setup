@@ -153,6 +153,7 @@ class PrivateResnet(nn.Module):
         self.layers = layers
         self.hiddens = hiddens
         self.dim_embedding = args.latent_dim
+        self.num_tasks = args.ntasks
 
         if self.use_resnet:
             resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
@@ -164,28 +165,66 @@ class PrivateResnet(nn.Module):
             self.num_ftrs = resnet18.fc.in_features
             
         else:
+            if args.experiment == 'cifar100':
+                hiddens=[32,32]
+                flatten=1152
+
+            elif args.experiment == 'miniimagenet':
+                # hiddens=[8,8]
+                # flatten=1800
+                hiddens=[16,16]
+                flatten=3600
+
+
+            elif args.experiment == 'multidatasets':
+                hiddens=[32,32]
+                flatten=1152
+
             self.ncha,self.size,_=args.inputsize
-            hiddens = [ int(h/2) for h in hiddens ]
-            hiddens.insert(0, self.ncha)
-            k_size = [self.size//8, self.size//10, 2]
 
-            self.conv = nn.ModuleList()
-            for i in range(args.ntasks):
-                s = self.size
-                layer = nn.Sequential()
-                for j in range(self.layers):
-                    layer.add_module('conv{}'.format(j+1), nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
-                    layer.add_module('bn{}'.format(j+1), nn.BatchNorm2d(hiddens[j+1]))
-                    layer.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
-                    layer.add_module('maxpool{}'.format(j+1), nn.MaxPool2d(2))
-                    #conv.append(layer)
 
-                    s=compute_conv_output_size(s,k_size[j])
-                    s=s//2
-
+            self.conv = torch.nn.ModuleList()
+            for _ in range(self.num_tasks):
+                layer = torch.nn.Sequential()
+                layer.add_module('conv1',nn.Conv2d(self.ncha, hiddens[0], kernel_size=self.size // 8))
+                layer.add_module('bn1', nn.BatchNorm2d(hiddens[0]))
+                layer.add_module('relu1', nn.ReLU(inplace=True))
+                # layer.add_module('drop1', nn.Dropout(0.2))
+                layer.add_module('maxpool1', nn.MaxPool2d(2))
+                layer.add_module('conv2', nn.Conv2d(hiddens[0], hiddens[1], kernel_size=self.size // 10))
+                layer.add_module('bn2', nn.BatchNorm2d(hiddens[1]))
+                layer.add_module('relu2', nn.ReLU(inplace=True))
+                # layer.add_module('dropout2', nn.Dropout(0.5))
+                layer.add_module('maxpool2', nn.MaxPool2d(2))
+                layer.add_module('flatten', nn.Flatten())
+                layer.add_module('linear1', nn.Linear(flatten,self.dim_embedding))
+                layer.add_module('relu3', nn.ReLU(inplace=True))
                 self.conv.append(layer)
-                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-                self.num_ftrs = hiddens[j+1]#*s*s
+                # self.linear = torch.nn.Sequential()
+
+                # self.linear.add_module('linear1', torch.nn.Linear(flatten,self.latent_dim))
+                # self.linear.add_module('relu3', torch.nn.ReLU(inplace=True))
+                # self.task_out.append(self.linear)
+
+            # self.conv = nn.ModuleList()
+            # for i in range(args.ntasks):
+            #     s = self.size
+            #     layer = nn.Sequential()
+            #     for j in range(self.layers):
+            #         layer.add_module('conv{}'.format(j+1), nn.Conv2d(hiddens[j], hiddens[j+1], kernel_size=k_size[j]))
+            #         layer.add_module('bn{}'.format(j+1), nn.BatchNorm2d(hiddens[j+1]))
+            #         layer.add_module('relu{}'.format(j+1), nn.ReLU(inplace=True))
+            #         layer.add_module('maxpool{}'.format(j+1), nn.MaxPool2d(2))
+            #         #conv.append(layer)
+
+            #         s=compute_conv_output_size(s,k_size[j])
+            #         s=s//2
+
+            #     self.conv.append(layer)
+                # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+                # self.num_ftrs = hiddens[j+1]#*s*s
+
+            self.num_ftrs = self.dim_embedding
 
         self.linear = nn.ModuleList()
         self.last_em = nn.ModuleList()
@@ -204,9 +243,9 @@ class PrivateResnet(nn.Module):
             self.last_em.append(nn.Sequential(
                         nn.Linear(self.num_ftrs, self.dim_embedding),
                         nn.ReLU(),
-                        #nn.Dropout(0.5),
-                        #nn.Linear(args.latent_dim, args.latent_dim),
-                        #nn.ReLU(),
+                        nn.Dropout(0.5),
+                        # nn.Linear(self.dim_embedding, self.dim_embedding),
+                        # nn.ReLU(),
                         #nn.Dropout(0.5)
                         ))
             self.linear.append(linear)
@@ -221,7 +260,7 @@ class PrivateResnet(nn.Module):
             x = self.feat_extraction(x).squeeze()
         else:
             x = self.conv[task_id](x)
-            x = self.avgpool(x).squeeze()
+            # x = self.avgpool(x).squeeze()
             #x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
 
         for i in range(self.layers):
@@ -299,7 +338,7 @@ class Net(nn.Module):
         if self.con_pri_shd:
             self.latent_dim *= 2
 
-        self.drop = nn.Dropout(0.5)
+        # self.drop = nn.Dropout(0.5)
         self.head = nn.ModuleList()
         for i in range(self.num_tasks):
             self.head.append(
@@ -307,11 +346,12 @@ class Net(nn.Module):
                     nn.Linear(self.latent_dim, self.hidden1),
                     #nn.BatchNorm1d(self.hidden1),
                     nn.ReLU(inplace=True),
-                    nn.Dropout(),
-                    nn.Linear(self.hidden1, self.hidden2),
+                    nn.Dropout(0.2),
+                    #nn.Linear(self.hidden1, self.hidden2),
                     #nn.BatchNorm1d(self.hidden2),
-                    nn.ReLU(inplace=True),
-                    nn.Linear(self.hidden2, self.taskcla[i][1])
+                    #nn.ReLU(inplace=True),
+                    # nn.Linear(self.hidden2, self.taskcla[i][1])
+                    nn.Linear(self.hidden1, self.taskcla[i][1])
                 ))
 
 
@@ -365,11 +405,11 @@ class Net(nn.Module):
         x_s = self.shared(x.clone(), m_p)
         #x_s = torch.zeros_like(x_p)
         #x_p = torch.zeros_like(x_p)
-        # x_s = torch.nn.functional.normalize(x_s, dim=1)
-        # x_p = torch.nn.functional.normalize(x_p, dim=1)
+        x_s = torch.nn.functional.normalize(x_s, dim=1)
+        x_p = torch.nn.functional.normalize(x_p, dim=1)
         # x_s /= x_s.sum(dim=1).unsqueeze(1)
         # x_p /= x_p.sum(dim=1).unsqueeze(1)
-        x = self.drop(torch.cat([x_p, x_s], dim=1))
+        x = torch.cat([x_p, x_s], dim=1)
         return self.head[task_id](x), reg_loss
 
     def forward3(self, x, task_id, inputs_feats):

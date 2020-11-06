@@ -358,8 +358,8 @@ def train_features(args, net, dataloader, task_id, criterion, device):
             if args.resnet18:
                 outs = net.private.feat_extraction(inputs_feats).squeeze()
             else:
-                outs = net.private.conv[task_id](inputs)#.view(inputs.size(0),-1)
-                outs = net.private.avgpool(outs).squeeze()
+                outs = net.private.conv[task_id](inputs)
+                # outs = net.private.avgpool(outs).squeeze()
             outs = clfs(outs)
             _, preds = outs.max(1)
 
@@ -382,8 +382,8 @@ def train_features(args, net, dataloader, task_id, criterion, device):
         if args.resnet18:
             outs = net.private.feat_extraction(inputs_feats).squeeze()
         else:
-            outs = net.private.conv[task_id](inputs)
-            outs = net.private.avgpool(outs).squeeze()
+            outs = net.private.conv[task_id](inputs)#.view(inputs.size(0),-1)
+            # outs = net.private.avgpool(outs).squeeze()
         outs = clfs(outs)
         _, preds = outs.max(1)
         correct_test += preds.eq(labels.view_as(preds)).sum().item()
@@ -483,8 +483,8 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
         t_net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
 
         params = []
-        for p in t_net.private.linear.parameters():
-            params.append(p)
+        # for p in t_net.private.linear.parameters():
+        #     params.append(p)
         for p in t_net.shared.parameters():
             params.append(p)
         for p in t_net.shared_clf.parameters():
@@ -593,7 +593,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
 
 
 
-    if task_id >= 0:
+    if task_id == 0:
         net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
         params = []
         for p in net.shared.parameters():
@@ -647,15 +647,18 @@ def prueba(args, net, task_id, dataloader, criterion, device):
 
 
 
-
+    net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
     params = []
     # for p in net.private.linear[task_id].parameters():
     #     params.append(p)
     for p in net.shared.parameters():
         params.append(p)
+    # for p in net.shared_clf.parameters():
+    #     params.append(p)
     opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
     #opti_shared = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, net, args.lr_meta, task_id)
     for e in range(args.meta_epochs):
+        # trainShared(args, net, dataloader['train'], task_id, opti_shared, criterion, net.forward3, device)
         #res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
         #meta_acc = res_train[0]
         meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
@@ -672,8 +675,8 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     for p in net.head[task_id].parameters():
         params.append(p)
-    for p in net.private.linear[task_id].parameters():
-        params.append(p)
+    # for p in net.private.linear[task_id].parameters():
+    #     params.append(p)
     opti = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
     #opti = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
     best_loss = np.inf
