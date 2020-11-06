@@ -418,8 +418,11 @@ class Net(nn.Module):
         else:
             x_p = x.clone()
         m_p, x_p = self.private(x_p, task_id)
+        reg_loss = 0.0
+        # for m in m_p:
+        #    reg_loss += m[0].abs().sum()/m[0].size(0)
         x_s = self.shared(x.clone(), m_p)
-        return self.shared_clf(x_s)
+        return self.shared_clf(x_s), reg_loss
 
     def forward4(self, x, task_id, inputs_feats):
         if self.private.use_resnet:
@@ -429,7 +432,31 @@ class Net(nn.Module):
         m_p, x_p = self.private(x_p, task_id)
         m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         x_s = self.shared(x.clone(), m_p)
-        return self.shared_clf(x_s)
+        return self.shared_clf(x_s), 0
+
+    def forward5(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, x_p = self.private(x_p, task_id)
+
+        reg_loss = 0.0
+        # for m in m_p:
+        #    reg_loss += m[0].abs().sum()/m[0].size(0)
+
+        x_s = self.shared(x.clone(), m_p)
+        return self.head[task_id](x_s), reg_loss
+
+    def forward6(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, x_p = self.private(x_p, task_id)
+        m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+        x_s = self.shared(x.clone(), m_p)
+        return self.head[task_id](x_s), 0
 
     def print_model_size(self):
         if self.use_private:

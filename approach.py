@@ -365,6 +365,8 @@ def train_features(args, net, dataloader, task_id, criterion, device):
 
             l = criterion(outs, labels)
             l.backward()
+            torch.nn.utils.clip_grad_norm_(net.private.conv[task_id].parameters(),0.5)
+            torch.nn.utils.clip_grad_norm_(clfs.parameters(),0.5)
 
             opti.step()
 
@@ -404,8 +406,11 @@ def test(net, task_id, dataloader, criterion, device):
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        #outs, _ = net(inputs, inputs_feats, task_id)
-        outs, _ = net.forward2(inputs, task_id, inputs_feats)
+        if net.con_pri_shd:
+            #outs, _ = net(inputs, inputs_feats, task_id)
+            outs, _ = net.forward2(inputs, task_id, inputs_feats)
+        else:
+            outs, _ = net.forward5(inputs, task_id, inputs_feats)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
@@ -456,7 +461,7 @@ def trainBatchPrueba(net, opti, criterion, batch, inner_loop, task_id, device):
         if opti is not None:
             opti.zero_grad()
 
-        outs = net.forward3(inputs, task_id, inputs_feats)
+        outs, _ = net.forward3(inputs, task_id, inputs_feats)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
@@ -536,9 +541,9 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
             labels = batch[1].to(device)
             inputs_feats = batch[2].to(device)
 
-            outs = fun_forward(inputs, task_id, inputs_feats)
+            outs, reg_loss  = fun_forward(inputs, task_id, inputs_feats)
             _, preds = outs.max(1)
-            l = criterion(outs, labels)
+            l = criterion(outs, labels) + reg_loss*0.01
             l.backward()
 
             opti_shared.step()
@@ -725,3 +730,61 @@ def prueba(args, net, task_id, dataloader, criterion, device):
     #     else:
     #         net.load_state_dict(copy.deepcopy(best_model).state_dict())
     #         opti_priv = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
+
+def prueba2(args, net, task_id, dataloader, criterion, device):
+    results = {
+        'meta_loss': [],
+        'meta_acc': [],
+        'val_loss': [],
+        'val_acc': [],
+        'train_loss': [],
+        'train_acc': []
+    }
+
+
+
+    train_features(args, net, dataloader, task_id, criterion, device)
+
+
+
+    if task_id == 0:
+        params = []
+        for p in net.shared.parameters():
+            params.append(p)
+        for p in net.head[task_id].parameters():
+            params.append(p)
+        opti_shared_task = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+        trainShared(args, net, dataloader['train'], task_id, opti_shared_task, criterion, net.forward6, device)
+
+
+
+    params = []
+    for p in net.private.linear[task_id].parameters():
+        params.append(p)
+    for p in net.head[task_id].parameters():
+        params.append(p)
+    opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+    trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
+
+
+
+
+
+    net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
+    params = []
+    for p in net.shared.parameters():
+        params.append(p)
+    opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
+    for e in range(args.meta_epochs):
+        meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
+
+
+
+    params = []
+    for p in net.private.linear[task_id].parameters():
+        params.append(p)
+    for p in net.head[task_id].parameters():
+        params.append(p)
+    opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+    trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)

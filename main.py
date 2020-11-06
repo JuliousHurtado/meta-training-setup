@@ -11,7 +11,7 @@ import torch.utils.data.distributed
 import utils
 
 from models.conv import Net
-from approach import train, test, trainAll, prueba
+from approach import train, test, trainAll, prueba, prueba2
 
 def run(args, run_id):
     # Args -- Experiment
@@ -70,7 +70,7 @@ def run(args, run_id):
         #else:
         #    res_task = train(args, net, t, dataset[t], criterion, device)
         
-        res_task = prueba(args, net, t, dataset[t], criterion, device)
+        res_task = prueba2(args, net, t, dataset[t], criterion, device)
         total_res[t] = res_task
         print('-'*150)
         print()
