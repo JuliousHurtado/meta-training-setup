@@ -340,19 +340,26 @@ class Net(nn.Module):
 
         # self.drop = nn.Dropout(0.5)
         self.head = nn.ModuleList()
-        for i in range(self.num_tasks):
-            self.head.append(
-                nn.Sequential(
-                    nn.Linear(self.latent_dim, self.hidden1),
-                    #nn.BatchNorm1d(self.hidden1),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout(0.2),
-                    #nn.Linear(self.hidden1, self.hidden2),
-                    #nn.BatchNorm1d(self.hidden2),
-                    #nn.ReLU(inplace=True),
-                    # nn.Linear(self.hidden2, self.taskcla[i][1])
-                    nn.Linear(self.hidden1, self.taskcla[i][1])
-                ))
+        if self.con_pri_shd:
+            for i in range(self.num_tasks):
+                self.head.append(
+                    nn.Sequential(
+                        nn.Linear(self.latent_dim*2, self.hidden1),
+                        #nn.BatchNorm1d(self.hidden1),
+                        nn.ReLU(inplace=True),
+                        nn.Dropout(0.2),
+                        #nn.Linear(self.hidden1, self.hidden2),
+                        #nn.BatchNorm1d(self.hidden2),
+                        #nn.ReLU(inplace=True),
+                        # nn.Linear(self.hidden2, self.taskcla[i][1])
+                        nn.Linear(self.hidden1, self.taskcla[i][1])
+                    ))
+        else:
+            for i in range(self.num_tasks):
+                self.head.append(
+                    nn.Sequential(
+                        nn.Linear(self.latent_dim, self.taskcla[i][1])
+                    ))
 
 
     def forward(self, x_s, x_p, task_id, use_only_share=False):
