@@ -585,17 +585,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
     }
 
 
-    # printSum(net, task_id)
-    
-
-
     train_features(args, net, dataloader, task_id, criterion, device)
-
-
-
-
-    # printSum(net, task_id)
-
 
 
     if task_id == 0:
@@ -609,32 +599,6 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         trainShared(args, net, dataloader['train'], task_id, opti_shared_task, criterion, net.forward4, device)
 
 
-        # for e in range(args.epochs):
-        #     correct = 0.0
-        #     total = 0.0
-        #     for i, batch in enumerate(dataloader['train']):
-        #         opti_shared_task.zero_grad()
-        #         inputs = batch[0].to(device)
-        #         labels = batch[1].to(device)
-        #         inputs_feats = batch[2].to(device)
-
-        #         outs = net.forward4(inputs, task_id)
-        #         _, preds = outs.max(1)
-        #         l = criterion(outs, labels)
-        #         l.backward()
-
-        #         opti_shared_task.step()
-
-        #         correct += preds.eq(labels.clone().view_as(preds)).sum().item()
-        #         total += inputs.size(0)
-
-        #     print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.epochs,correct/total))
-
-
-
-
-    # printSum(net, task_id)
-
     net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
     params = []
     for p in net.private.linear[task_id].parameters():
@@ -643,12 +607,6 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
     trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward3, device)
-
-
-
-
-
-    # printSum(net, task_id)
 
 
 
@@ -668,10 +626,6 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         #meta_acc = res_train[0]
         meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
-
-
-
-    # printSum(net, task_id)
 
 
 
@@ -700,36 +654,6 @@ def prueba(args, net, task_id, dataloader, criterion, device):
             opti_priv = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
 
 
-    # printSum(net, task_id)
-
-
-
-
-    # for e in range(args.epochs):
-    #     if args.use_meta:
-    #         meta_acc = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
-    #     else:
-    #         res_train = trainPrueba(net, task_id, dataloader['train'], opti_shared, criterion, device)
-    #         meta_acc = 0
-
-    #     for _ in range(args.epochs_inner_task):
-    #         res_train = trainPrueba(net, task_id, dataloader['train'], opti, criterion, device)
-
-    #     res_test = test(net, task_id, dataloader['valid'], criterion, device)
-
-    #     print("[{}|{}]Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f} \t Meta Acc: {:.4f}".format(e+1,args.epochs,res_train[1], res_train[0], res_test[0], meta_acc))
-
-    #     results['train_loss'].append(res_train[1])
-    #     results['train_acc'].append(res_train[0])
-    #     results['val_acc'].append(res_test[0])
-    #     results['meta_acc'].append(meta_acc)
-
-    #     if res_test[1] < best_loss:
-    #         best_loss = res_test[1]
-    #         best_model = copy.deepcopy(net)
-    #     else:
-    #         net.load_state_dict(copy.deepcopy(best_model).state_dict())
-    #         opti_priv = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
 
 def prueba2(args, net, task_id, dataloader, criterion, device):
     results = {
