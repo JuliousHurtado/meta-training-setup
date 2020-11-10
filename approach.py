@@ -419,7 +419,7 @@ def test(net, task_id, dataloader, criterion, device):
         loss += l.item()
 
         total += inputs.size(0)
-
+    net.train()
     return correct/total, loss/len(dataloader)
 
 def trainPrueba(net, task_id, loader, opti, criterion, device):
@@ -535,6 +535,7 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
     for e in range(args.feats_epochs):
         correct = 0.0
         total = 0.0
+        loss = 0.0
         for i, batch in enumerate(loader):
             opti_shared.zero_grad()
             inputs = batch[0].to(device)
@@ -550,8 +551,10 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
 
             correct += preds.eq(labels.clone().view_as(preds)).sum().item()
             total += inputs.size(0)
+            loss += l.item()
 
-    print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
+    #print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
+    return correct/total, loss/len(loader)
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0
@@ -688,8 +691,9 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
     for p in net.head[task_id].parameters():
         params.append(p)
     opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
-    trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
-
+    acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
+    acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+    print("Mask Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
 
 
 
@@ -711,4 +715,6 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
     for p in net.head[task_id].parameters():
         params.append(p)
     opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
-    trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
+    acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
+    acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+    print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
