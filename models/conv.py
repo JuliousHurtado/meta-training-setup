@@ -154,6 +154,7 @@ class PrivateResnet(nn.Module):
         self.hiddens = hiddens
         self.dim_embedding = args.latent_dim
         self.num_tasks = args.ntasks
+        self.use_em = args.con_pri_shd
 
         if self.use_resnet:
             resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
@@ -239,17 +240,20 @@ class PrivateResnet(nn.Module):
                                 #nn.Dropout(0.25),
                             )
                 linear.append(mask_lin)
-            # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
-            self.last_em.append(nn.Sequential(
-                        nn.Linear(self.num_ftrs, self.dim_embedding),
-                        nn.ReLU(),
-                        nn.Dropout(0.5),
-                        # nn.Linear(self.dim_embedding, self.dim_embedding),
-                        # nn.ReLU(),
-                        #nn.Dropout(0.5)
-                        ))
             self.linear.append(linear)
 
+
+            if args.con_pri_shd:
+                # mask_lin = nn.Linear(self.num_ftrs, 2*self.hiddens[-1])
+                self.last_em.append(nn.Sequential(
+                            nn.Linear(self.num_ftrs, self.dim_embedding),
+                            nn.ReLU(),
+                            nn.Dropout(0.5),
+                            # nn.Linear(self.dim_embedding, self.dim_embedding),
+                            # nn.ReLU(),
+                            #nn.Dropout(0.5)
+                            ))
+                
     def forward(self, x, task_id):
         m = []
 
@@ -280,7 +284,8 @@ class PrivateResnet(nn.Module):
         #         film_vector[:,1,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
         #         ])
 
-        x = self.last_em[task_id](x)
+        if self.use_em:
+            x = self.last_em[task_id](x)
 
         return m, x
 
