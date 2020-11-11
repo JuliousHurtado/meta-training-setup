@@ -704,7 +704,10 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
     for e in range(args.meta_epochs):
-        meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        if args.use_meta:
+            meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        else:
+            meta_acc, meta_loss = trainShared(args, net, dataloader['train'], task_id, opti_shared, criterion, net.forward5, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
 
 
