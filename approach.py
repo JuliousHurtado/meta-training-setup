@@ -702,6 +702,10 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
     params = []
     for p in net.shared.parameters():
         params.append(p)
+    if not args.use_meta:
+        args.meta_epochs = 1
+        for p in net.head[task_id].parameters():
+            params.append(p)
     opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
     for e in range(args.meta_epochs):
         if args.use_meta:
