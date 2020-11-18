@@ -587,8 +587,8 @@ def prueba(args, net, task_id, dataloader, criterion, device):
         'train_acc': []
     }
 
-
-    train_features(args, net, dataloader, task_id, criterion, device)
+    if not args.resnet18:
+        train_features(args, net, dataloader, task_id, criterion, device)
 
 
     if task_id == 0:
@@ -669,8 +669,8 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
     }
 
 
-
-    train_features(args, net, dataloader, task_id, criterion, device)
+    if not args.resnet18:
+        train_features(args, net, dataloader, task_id, criterion, device)
 
 
 
