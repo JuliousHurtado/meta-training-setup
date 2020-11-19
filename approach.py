@@ -36,7 +36,7 @@ def getOptimizer(shared, private, private_lin, head, net, lr, task_id):
 def init_grads_out(net):
     grads = {}
 
-    for n,p in net.named_parameters():
+    for n,p in net.shared.named_parameters():
         grads[n] = torch.zeros_like(p)
 
     return grads
@@ -44,7 +44,7 @@ def init_grads_out(net):
 def get_diff_weights(old_net, new_net, device='cuda'):
     grads = {}
 
-    for (_,p_new),(n,p_old) in zip(new_net.named_parameters(), old_net.named_parameters()):
+    for (_,p_new),(n,p_old) in zip(new_net.shared.named_parameters(), old_net.shared.named_parameters()):
         grads[n] = (p_new - p_old).to(device)
 
     return grads 
