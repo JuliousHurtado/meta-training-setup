@@ -671,6 +671,9 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
 
     if not args.resnet18:
         train_features(args, net, dataloader, task_id, criterion, device)
+        mask_lr = args.lr_task
+    else:
+        mask_lr = args.lr_task*0.1
 
 
 
@@ -690,7 +693,7 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     for p in net.head[task_id].parameters():
         params.append(p)
-    opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+    opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
     acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
     acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
     print("Mask Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
@@ -721,7 +724,7 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
         params.append(p)
     for p in net.head[task_id].parameters():
         params.append(p)
-    opti_shared_mask = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
+    opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
     acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
     acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
     print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
