@@ -337,6 +337,7 @@ class Net(nn.Module):
         self.use_share = args.use_share
         self.use_private = args.use_private
         self.use_mask = args.use_mask
+        self.only_shared = args.only_shared
         # self.diff_pri_shar = args.diff_pri_shar
 
         self.latent_dim = args.latent_dim
@@ -433,6 +434,8 @@ class Net(nn.Module):
         reg_loss = 0.0
         # for m in m_p:
         #    reg_loss += m[0].abs().sum()/m[0].size(0)
+        if self.only_shared:
+            m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         x_s = self.shared(x.clone(), m_p)
         return self.shared_clf(x_s), reg_loss
 
@@ -456,7 +459,9 @@ class Net(nn.Module):
         reg_loss = 0.0
         # for m in m_p:
         #    reg_loss += m[0].abs().sum()/m[0].size(0)
-
+        if self.only_shared:
+            m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+            
         x_s = self.shared(x.clone(), m_p)
         return self.head[task_id](x_s), reg_loss
 
