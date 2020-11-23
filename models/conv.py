@@ -318,9 +318,11 @@ class Net(nn.Module):
         else:
             raise NotImplementedError
 
-        self.regs = []
-        if args.mask_reg:
-            self.regs.append(MaskRegularization(args.mask_theta))
+        #self.regs = []
+        #if args.mask_reg:
+        #    self.regs.append(MaskRegularization(args.mask_theta))
+        self.mask_reg = args.mask_reg
+        self.mask_ref_coef = args.mask_theta
 
         # if args.diff_reg:
         #     self.regs.append(DiffRegularization(args.diff_theta))
@@ -431,13 +433,16 @@ class Net(nn.Module):
         else:
             x_p = x.clone()
         m_p, x_p = self.private(x_p, task_id)
+
         reg_loss = 0.0
-        # for m in m_p:
-        #    reg_loss += m[0].abs().sum()/m[0].size(0)
+        # if self.mask_reg:
+        #     for m in m_p:
+        #        reg_loss += m[0].abs().sum()/m[0].size(0)
+
         if self.only_shared:
             m_p = [ [torch.ones_like(m[0])] for m in m_p ]
         x_s = self.shared(x.clone(), m_p)
-        return self.shared_clf(x_s), reg_loss
+        return self.shared_clf(x_s), reg_loss*self.mask_ref_coef
 
     def forward4(self, x, task_id, inputs_feats):
         if self.private.use_resnet:
@@ -457,13 +462,15 @@ class Net(nn.Module):
         m_p, x_p = self.private(x_p, task_id)
 
         reg_loss = 0.0
-        # for m in m_p:
-        #    reg_loss += m[0].abs().sum()/m[0].size(0)
+        if self.mask_reg:
+            for m in m_p:
+               reg_loss += m[0].abs().sum()/m[0].size(0)
+
         if self.only_shared:
             m_p = [ [torch.ones_like(m[0])] for m in m_p ]
-            
+
         x_s = self.shared(x.clone(), m_p)
-        return self.head[task_id](x_s), reg_loss
+        return self.head[task_id](x_s), reg_loss*self.mask_ref_coef
 
     def forward6(self, x, task_id, inputs_feats):
         if self.private.use_resnet:

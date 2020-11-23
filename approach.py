@@ -544,7 +544,11 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
 
             outs, reg_loss  = fun_forward(inputs, task_id, inputs_feats)
             _, preds = outs.max(1)
-            l = criterion(outs, labels) + reg_loss*0.01
+            # if reg_loss > 0:
+            #     print(reg_loss)
+            l = criterion(outs, labels) + reg_loss
+            # if reg_loss > 0:
+            #     print(l)
             l.backward()
 
             opti_shared.step()
