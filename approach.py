@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import random
 
 import torch
 from torch import optim
@@ -479,7 +480,7 @@ def trainBatchPrueba(net, opti, criterion, batch, inner_loop, task_id, device):
 
     return running_loss, correct/inputs.size(0)
 
-def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
+def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, memory):
     grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
@@ -498,22 +499,40 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device):
         opti_shared_task = optim.SGD(params, args.lr_meta, weight_decay=0.1, momentum=0.9)
         # opti_shared_task = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, t_net, args.lr_meta, task_id)
         
-        try:
-            batch = next(iter_data_train)
-        except:
-            iter_data_train = iter(loader)
-            batch = next(iter_data_train)
+        prob = random.uniform(0, 1)
+        if args.use_memory and prob < args.prob_use_mem and task_id > 0:
+            task_key = random.sample(memory.keys(), 1)[0]
+            batch = random.sample(memory[task_key], 1)[0]
+            batch_task_id = task_key
+        else:
+            try:
+                batch = next(iter_data_train)
+            except:
+                iter_data_train = iter(loader)
+                batch = next(iter_data_train)
 
-        temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, device) 
+            if task_id not in memory:
+                memory[task_id] = []
+
+            prob = random.uniform(0, 1)
+            if len(memory[task_id]) < args.mem_size:
+                memory[task_id].append(batch)
+            elif prob < 0.7:
+                idex = random.sample(list(range(len(memory[task_id]))), 1)[0]
+                memory[task_id][idex] = batch
+
+            batch_task_id = task_id
+
+        temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, batch_task_id, device) 
         loss_mini_task += temp_loss
 
         grads_acc['grads'].append(get_diff_weights(net, t_net, 'cuda'))
         
-        try:
-            batch = next(iter_data_val)
-        except:
-            iter_data_val = iter(loader)
-            batch = next(iter_data_val)
+        # try:
+        #     batch = next(iter_data_val)
+        # except:
+        #     iter_data_val = iter(loader)
+        #     batch = next(iter_data_val)
        
         _, acc_mini= trainBatchPrueba(t_net, None, None, batch, 1, task_id, device)
         grads_acc['acc'].append(acc_mini)
@@ -662,7 +681,7 @@ def prueba(args, net, task_id, dataloader, criterion, device):
 
 
 
-def prueba2(args, net, task_id, dataloader, criterion, device):
+def prueba2(args, net, task_id, dataloader, criterion, device, memory):
     results = {
         'meta_loss': [],
         'meta_acc': [],
@@ -718,7 +737,7 @@ def prueba2(args, net, task_id, dataloader, criterion, device):
     opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
     for e in range(args.meta_epochs):
         if args.use_meta:
-            meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+            meta_acc, meta_loss = trainTaskPrueba(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
             meta_acc, meta_loss = trainShared(args, net, dataloader['train'], task_id, opti_shared, criterion, net.forward5, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
