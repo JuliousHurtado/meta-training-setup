@@ -56,6 +56,7 @@ def run(args, run_id):
     lss=np.zeros((len(args.taskcla),len(args.taskcla)),dtype=np.float32)
 
     total_res = {}
+    memory = {}
     for t,ncla in args.taskcla:
         print('*'*150)
         dataset = dataloader.get(t)
@@ -70,7 +71,7 @@ def run(args, run_id):
         #else:
         #    res_task = train(args, net, t, dataset[t], criterion, device)
         
-        res_task = prueba2(args, net, t, dataset[t], criterion, device)
+        res_task = prueba2(args, net, t, dataset[t], criterion, device, memory)
         total_res[t] = res_task
         print('-'*150)
         print()
