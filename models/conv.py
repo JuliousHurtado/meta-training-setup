@@ -519,3 +519,10 @@ class Net(nn.Module):
             num/=1000.0
         return '%.1f%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])
 
+    def get_masks(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+        m_p, _ = self.private(x_p, task_id)
+        return m_p

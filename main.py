@@ -11,7 +11,7 @@ import torch.utils.data.distributed
 import utils
 
 from models.conv import Net
-from approach import train, test, trainAll, prueba, prueba2
+from approach import train, test, trainAll, prueba, prueba2, getMasks
 
 def run(args, run_id):
     # Args -- Experiment
@@ -57,6 +57,12 @@ def run(args, run_id):
 
     total_res = {}
     memory = {}
+    change = { 0: {} }
+
+    for n,p in net.shared.named_parameters():
+        change[0][n] = p.to('cpu')
+
+    masks = {}
     for t,ncla in args.taskcla:
         print('*'*150)
         dataset = dataloader.get(t)
@@ -76,6 +82,12 @@ def run(args, run_id):
         print('-'*150)
         print()
 
+        change[t+1] = {}
+        for n,p in net.shared.named_parameters():
+            change[t+1][n] = p.to('cpu') - change[0][n]
+
+        masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
+
         for u in range(t+1):
             test_res = test(net, u, dataset[u]['test'], criterion, device)
 
@@ -87,7 +99,8 @@ def run(args, run_id):
             lss[t, u] = test_res[1]
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
-
+    torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
+            '{}_{}_{}_{}.pth'.format(args.experiment, run_id. args.meta_epochs, args.resnet18))
     return avg_acc, gem_bwt, total_res
 
 def main(args):
