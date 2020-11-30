@@ -178,8 +178,8 @@ class PrivateResnet(nn.Module):
 
 
             elif args.experiment == 'multidatasets':
-                hiddens=[32,32]
-                flatten=1152
+                hiddens=[28,28]
+                flatten=700
 
             self.ncha,self.size,_=args.inputsize
 
@@ -266,7 +266,7 @@ class PrivateResnet(nn.Module):
             x = self.conv[task_id](x)
             # x = self.avgpool(x).squeeze()
             #x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
-
+        
         for i in range(self.layers):
             film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
             m.append([
