@@ -100,7 +100,7 @@ def run(args, run_id):
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
-            '{}_{}_{}_{}.pth'.format(args.experiment, run_id. args.meta_epochs, args.resnet18))
+            'masks/{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
     return avg_acc, gem_bwt, total_res
 
 def main(args):
