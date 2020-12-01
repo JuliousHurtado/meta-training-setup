@@ -178,8 +178,10 @@ class PrivateResnet(nn.Module):
 
 
             elif args.experiment == 'multidatasets':
-                hiddens=[64,128]
-                flatten=4608
+                # hiddens=[64,128]
+                # flatten=4608
+                hiddens=[32,32]
+                flatten=1152
 
             self.ncha,self.size,_=args.inputsize
 
