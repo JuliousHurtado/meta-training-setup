@@ -563,11 +563,7 @@ def trainShared(args, net, loader, task_id, opti_shared, criterion, fun_forward,
 
             outs, reg_loss  = fun_forward(inputs, task_id, inputs_feats)
             _, preds = outs.max(1)
-            # if reg_loss > 0:
-            #     print(reg_loss)
             l = criterion(outs, labels) + reg_loss
-            # if reg_loss > 0:
-            #     print(l)
             l.backward()
 
             opti_shared.step()
@@ -727,8 +723,10 @@ def prueba2(args, net, task_id, dataloader, criterion, device, memory):
             params.append(p)
         for p in net.head[task_id].parameters():
             params.append(p)
-        opti_shared_task = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
-        trainShared(args, net, dataloader['train'], task_id, opti_shared_task, criterion, net.forward6, device)
+        opti_shared_task = optim.SGD(params, args.lr_task, weight_decay=0.9, momentum=0.9)
+        acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_task, criterion, net.forward6, device)
+        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        print("Train Shared: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train. acc_valid))
 
 
     if not args.only_shared:
