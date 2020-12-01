@@ -202,6 +202,7 @@ class PrivateResnet(nn.Module):
                 layer.add_module('flatten', nn.Flatten())
                 layer.add_module('linear1', nn.Linear(flatten,self.dim_embedding))
                 layer.add_module('relu3', nn.ReLU(inplace=True))
+                layer.add_module('drop', nn.Dropout(0.5))
                 self.conv.append(layer)
                 # self.linear = torch.nn.Sequential()
 
