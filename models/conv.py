@@ -22,6 +22,9 @@ class Shared(nn.Module):
         self.taskcla=args.taskcla
         self.latent_dim = args.latent_dim
 
+        #if args.experiment == 'miniimagenet':
+        #    k_size = [10, 5, 3]
+        #else:
         k_size = [size//8, size//10, 2]
 
         self.conv1=nn.Conv2d(self.ncha,hiddens[0],kernel_size=k_size[0])
@@ -43,7 +46,7 @@ class Shared(nn.Module):
         self.drop2=nn.Dropout(0.5)
         self.fc1=nn.Linear(hiddens[2]*s*s,self.latent_dim)
         #self.bn4=nn.BatchNorm1d(hiddens[3], affine=True, track_running_stats=False)
-        #self.fc2=nn.Linear(hiddens[3],self.latent_dim)
+        #self.fc2=nn.Linear(self.latent_dim,self.latent_dim)
         #self.bn5=nn.BatchNorm1d(self.latent_dim, affine=True, track_running_stats=False)
         #self.fc3=nn.Linear(hiddens[4],self.latent_dim)
         # self.bn6=nn.BatchNorm1d(hiddens[5], affine=True, track_running_stats=False)
@@ -202,7 +205,7 @@ class PrivateResnet(nn.Module):
                 layer.add_module('flatten', nn.Flatten())
                 layer.add_module('linear1', nn.Linear(flatten,self.dim_embedding))
                 layer.add_module('relu3', nn.ReLU(inplace=True))
-                layer.add_module('drop', nn.Dropout(0.5))
+                #layer.add_module('drop', nn.Dropout(0.5))
                 self.conv.append(layer)
                 # self.linear = torch.nn.Sequential()
 

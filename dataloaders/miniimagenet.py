@@ -100,7 +100,7 @@ class iMiniImageNet(MiniImageNet):
         if not torch.is_tensor(img):
             img = Image.fromarray(img)
             img = self.transform(img)
-        return img, target, tt, td
+        return img, target, torch.zeros_like(img)#, td
 
 
 
@@ -203,10 +203,6 @@ class DatasetGen(object):
         self.dataloaders[task_id]['valid'] = valid_loader
         self.dataloaders[task_id]['test'] = test_loader
         self.dataloaders[task_id]['name'] = 'iMiniImageNet-{}-{}'.format(task_id,self.task_ids[task_id])
-        self.dataloaders[task_id]['tsne'] = torch.utils.data.DataLoader(self.test_set[task_id],
-                                                                        batch_size=len(test_loader.dataset),
-                                                                        num_workers=self.num_workers,
-                                                                        pin_memory=self.pin_memory, shuffle=True)
 
         print ("Task ID: ", task_id)
         print ("Training set size:   {} images of {}x{}".format(len(train_loader.dataset),self.inputsize[1],self.inputsize[1]))
@@ -214,30 +210,5 @@ class DatasetGen(object):
         print ("Train+Val  set size: {} images of {}x{}".format(len(valid_loader.dataset)+len(train_loader.dataset),self.inputsize[1],self.inputsize[1]))
         print ("Test set size:       {} images of {}x{}".format(len(test_loader.dataset),self.inputsize[1],self.inputsize[1]))
 
-        if self.use_memory == 'yes' and self.num_samples > 0 :
-            self.update_memory(task_id)
-
-
         return self.dataloaders
 
-
-
-    def update_memory(self, task_id):
-        num_samples_per_class = self.num_samples // len(self.task_ids[task_id])
-        mem_class_mapping = {i: i for i, c in enumerate(self.task_ids[task_id])}
-
-        for i in range(len(self.task_ids[task_id])):
-            data_loader = torch.utils.data.DataLoader(self.train_split[task_id], batch_size=1,
-                                                        num_workers=self.num_workers,
-                                                        pin_memory=self.pin_memory)
-
-            randind = torch.randperm(len(data_loader.dataset))[:num_samples_per_class]  # randomly sample some data
-
-
-            for ind in randind:
-                self.task_memory[task_id]['x'].append(data_loader.dataset[ind][0])
-                self.task_memory[task_id]['y'].append(mem_class_mapping[i])
-                self.task_memory[task_id]['tt'].append(data_loader.dataset[ind][2])
-                self.task_memory[task_id]['td'].append(data_loader.dataset[ind][3])
-
-        print ('Memory updated by adding {} images'.format(len(self.task_memory[task_id]['x'])))
