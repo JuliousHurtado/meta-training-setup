@@ -81,7 +81,7 @@ class DatasetGen(object):
             self.crop_private = 224
         else:
             self.size_private = 32
-            self.crop_private = 28
+            self.crop_private = 32
 
         self.inputsize = [3,32,32]
 
@@ -153,7 +153,8 @@ class DatasetGen(object):
         dataset_name = list(mean_datasets.keys())[dataset_idx]
         nspc = num_samples_per_class
 
-        transformation = transforms.Compose([transforms.CenterCrop(28),
+        transformation = transforms.Compose([transforms.Resize(self.size_private),
+                                             transforms.CenterCrop(self.crop_private),
                                              transforms.ToTensor(),
                                              transforms.Normalize(mean_datasets[dataset_name],std_datasets[dataset_name])])
         transform_feats = transforms.Compose([transforms.Resize(self.size_private),
