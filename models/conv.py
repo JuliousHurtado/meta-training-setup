@@ -451,13 +451,13 @@ class Net(nn.Module):
         return self.shared_clf(x_s), reg_loss*self.mask_ref_coef
 
     def forward4(self, x, task_id, inputs_feats):
-        if self.private.use_resnet:
-            x_p = inputs_feats
-        else:
-            x_p = x.clone()
-        m_p, x_p = self.private(x_p, task_id)
-        m_p = [ [torch.ones_like(m[0])] for m in m_p ]
-        x_s = self.shared(x.clone(), m_p)
+        # if self.private.use_resnet:
+        #     x_p = inputs_feats
+        # else:
+        #     x_p = x.clone()
+        # m_p, x_p = self.private(x_p, task_id)
+        # m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+        x_s = self.shared(x.clone(), None)
         return self.shared_clf(x_s), 0
 
     def forward5(self, x, task_id, inputs_feats):

@@ -75,14 +75,14 @@ class iMiniImageNet(MiniImageNet):
                 td.append(task_num+1)
                 self.class_indices[self.class_mapping[self.labels[i]]].append(i)
 
-        if memory_classes:
-            for task_id in range(task_num):
-                for i in range(len(memory[task_id]['x'])):
-                    if memory[task_id]['y'][i] in range(len(memory_classes[task_id])):
-                        data.append(memory[task_id]['x'][i])
-                        labels.append(memory[task_id]['y'][i])
-                        tt.append(memory[task_id]['tt'][i])
-                        td.append(memory[task_id]['td'][i])
+        # if memory_classes:
+        #     for task_id in range(task_num):
+        #         for i in range(len(memory[task_id]['x'])):
+        #             if memory[task_id]['y'][i] in range(len(memory_classes[task_id])):
+        #                 data.append(memory[task_id]['x'][i])
+        #                 labels.append(memory[task_id]['y'][i])
+        #                 tt.append(memory[task_id]['tt'][i])
+        #                 td.append(memory[task_id]['td'][i])
 
         self.data = np.array(data)
         self.labels = labels
