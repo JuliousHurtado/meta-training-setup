@@ -56,7 +56,7 @@ class Shared(nn.Module):
     def forward(self, x_s, mask):
         # print(x_s.size())
         if len(x_s.size()) == 2:
-            x_s = x_s.view(x_s.size(0), 1, 28, 28)
+            x_s = x_s.view(x_s.size(0), 1, 32, 32)
 
         #h = self.maxpool(self.relu(self.bn1(self.conv1(x_s))))
         h = self.maxpool(self.relu(self.conv1(x_s)))
@@ -70,6 +70,7 @@ class Shared(nn.Module):
         h = self.maxpool(self.relu(self.conv3(h)))
         if mask:
             h = h * mask[2][0]# + mask[2][1]
+        # print(h.size())
         h = h.view(x_s.size(0), -1)
         #h = self.drop2(self.relu(self.bn4(self.fc1(h))))
         #h = self.drop2(self.relu(self.bn4(self.fc2(h))))
