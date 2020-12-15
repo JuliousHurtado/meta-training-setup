@@ -46,7 +46,7 @@ def get_diff_weights(old_net, new_net, device='cuda'):
     grads = {}
 
     for (_,p_new),(n,p_old) in zip(new_net.shared.named_parameters(), old_net.shared.named_parameters()):
-        grads[n] = (p_new - p_old).to(device)
+        grads[n] = (p_new - p_old)#.to(device)
 
     return grads 
 
@@ -526,7 +526,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
         temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, batch_task_id, device) 
         loss_mini_task += temp_loss
 
-        grads_acc['grads'].append(get_diff_weights(net, t_net, 'cuda'))
+        grads_acc['grads'].append(get_diff_weights(net, t_net))
         
         # try:
         #     batch = next(iter_data_val)

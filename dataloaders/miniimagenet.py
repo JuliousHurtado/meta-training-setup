@@ -54,6 +54,7 @@ class iMiniImageNet(MiniImageNet):
         super(iMiniImageNet, self).__init__(root=root, train=train)
 
         self.transform = transform
+        self.transform_feats = transform_feats
         if not isinstance(classes, list):
             classes = [classes]
 
@@ -102,15 +103,12 @@ class iMiniImageNet(MiniImageNet):
             img = Image.fromarray(img)
             img_org = self.transform(img)
 
-        try:
-            if self.transform_feats is not None:
-                img_feats = self.transform_feats(img)
-        except:
-            pass
+        if self.transform_feats is not None:
+            img_feats = self.transform_feats(img)
+        else:
+            img_feats = torch.zeros_like(img_org)
 
-        return img, target, img_feats#, td
-
-
+        return img_org, target, img_feats#, td
 
 
     def __len__(self):
@@ -146,8 +144,8 @@ class DatasetGen(object):
                                     transforms.ToTensor(),
                                     transforms.Normalize(mean=mean, std=std)])
         if args.resnet18:
-            self.transformation_feats = transforms.Compose([transforms.Resize(self.size_private),
-                                        transforms.CenterCrop(self.crop_private), 
+            self.transformation_feats = transforms.Compose([transforms.Resize(256),
+                                        transforms.CenterCrop(224), 
                                         transforms.ToTensor(), 
                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
         else:
