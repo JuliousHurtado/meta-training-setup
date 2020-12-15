@@ -49,7 +49,8 @@ class MiniImageNet(torch.utils.data.Dataset):
 
 class iMiniImageNet(MiniImageNet):
 
-    def __init__(self, root, classes, memory_classes, memory, task_num, train, transform=None):
+    def __init__(self, root, classes, memory_classes, memory, task_num, train, transform=None, 
+                                        transform_feats=None):
         super(iMiniImageNet, self).__init__(root=root, train=train)
 
         self.transform = transform
@@ -99,8 +100,15 @@ class iMiniImageNet(MiniImageNet):
         # to return a PIL Image
         if not torch.is_tensor(img):
             img = Image.fromarray(img)
-            img = self.transform(img)
-        return img, target, torch.zeros_like(img)#, td
+            img_org = self.transform(img)
+
+        try:
+            if self.transform_feats is not None:
+                img_feats = self.transform_feats(img)
+        except:
+            pass
+
+        return img, target, img_feats#, td
 
 
 
@@ -137,6 +145,14 @@ class DatasetGen(object):
                                     transforms.Resize((84,84)),
                                     transforms.ToTensor(),
                                     transforms.Normalize(mean=mean, std=std)])
+        if args.resnet18:
+            self.transformation_feats = transforms.Compose([transforms.Resize(self.size_private),
+                                        transforms.CenterCrop(self.crop_private), 
+                                        transforms.ToTensor(), 
+                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+        else:
+            self.transformation_feats = None
+
 
         self.taskcla = [[t, int(self.num_classes/self.num_tasks)] for t in range(self.num_tasks)]
 
@@ -181,10 +197,12 @@ class DatasetGen(object):
 
         self.train_set[task_id] = iMiniImageNet(root=self.root, classes=self.task_ids[task_id],
                                                 memory_classes=memory_classes, memory=memory,
-                                                task_num=task_id, train=True, transform=self.transformation)
+                                                task_num=task_id, train=True, transform=self.transformation,
+                                                transform_feats=self.transformation_feats)
 
         self.test_set[task_id] = iMiniImageNet(root=self.root, classes=self.task_ids[task_id], memory_classes=None,
-                                        memory=None, task_num=task_id, train=False, transform=self.transformation)
+                                        memory=None, task_num=task_id, train=False, transform=self.transformation,
+                                        transform_feats=self.transformation_feats)
 
 
         split = int(np.floor(self.pc_valid * len(self.train_set[task_id])))
