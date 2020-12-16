@@ -597,22 +597,24 @@ def printSum(net, task_id):
                         p_lin, p_emb, head, shared))
 
 def getMasks(net, task_id, dataloader, device):
-    m_all = {}
+    m_all = {'masks': {}, 'labels': []}
     for i, batch in enumerate(dataloader):
         inputs = batch[0].to(device)
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
+        m_all['labels'].extend(labels)
+
         masks = net.get_masks(inputs, task_id, inputs_feats)
 
         for i, m in enumerate(masks):
-            if i not in m_all:
-                m_all[i] = []
-            m_all[i].append(m[0].squeeze().mean(dim=0).tolist())
+            if i not in m_all['masks']:
+                m_all['masks'][i] = []
+            #m_all[i].append(m[0].squeeze().mean(dim=0).tolist())
+            m_all['masks'][i].extend(m[0].squeeze().tolist())
 
-    for k,v in m_all.items():
-        m_all[k] = np.mean(v, axis = 0)
-
+    # for k,v in m_all.items():
+    #     m_all[k] = np.mean(v, axis = 0)
     return m_all
 
 def prueba(args, net, task_id, dataloader, criterion, device):
