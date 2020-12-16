@@ -144,8 +144,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Adversarial Continual Learning...')
     # Load the config file
     parser.add_argument('--config', type=str, default='./configs/config_mnist5.yml')
+    parser.add_argument('--mini-tasks', type=int, default=-1)
+    parser.add_argument('--inner-loop', type=int, default=-1)
+    
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
+
+    if flags.mini_tasks >= 0:
+        args.mini_tasks = flags.mini_tasks
+    if flags.inner_loop >= 0:
+        args.inner_loop = flags.inner_loop
 
     # for m_task in [1,5,10,20,30,40]:
     #     for i_loop in [1,5,10,20,35,50]:
