@@ -412,6 +412,7 @@ def test(net, task_id, dataloader, criterion, device):
             outs, _ = net.forward2(inputs, task_id, inputs_feats)
         else:
             outs, _ = net.forward5(inputs, task_id, inputs_feats)
+        # outs, _ = net(inputs, task_id, inputs_feats)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()
@@ -696,8 +697,6 @@ def prueba(args, net, task_id, dataloader, criterion, device):
             net.load_state_dict(copy.deepcopy(best_model).state_dict())
             opti_priv = getOptimizer(args.shad_task, args.priv_task, args.priv_l_task, args.head_task, net, args.lr_task, task_id)
 
-
-
 def prueba2(args, net, task_id, dataloader, criterion, device, memory):
     results = {
         'meta_loss': [],
@@ -780,3 +779,12 @@ def prueba2(args, net, task_id, dataloader, criterion, device, memory):
         acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward5, device)
         acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
         print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+
+
+def train_extra(args, net, task_id, dataloader, criterion, device):
+
+    opti_shared_mask = optim.SGD(net.parameters(), args.lr_task, weight_decay=0.01, momentum=0.9)
+    acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward, device)
+    acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+    print("Train Extra: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+

@@ -11,7 +11,8 @@ import torch.utils.data.distributed
 import utils
 
 from models.conv import Net
-from approach import train, test, trainAll, prueba, prueba2, getMasks
+from models.hat import HatNet
+from approach import train, test, trainAll, prueba, prueba2, getMasks, train_extra
 
 def run(args, run_id):
     # Args -- Experiment
@@ -46,6 +47,7 @@ def run(args, run_id):
 
     # Model
     net = Net(args, device)
+    # net = HatNet(args.inputsize, args.taskcla)
     net = net.to(device)
 
     criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -59,8 +61,8 @@ def run(args, run_id):
     memory = {}
     change = { 0: {} }
 
-    for n,p in net.shared.named_parameters():
-        change[0][n] = p.to('cpu')
+    # for n,p in net.shared.named_parameters():
+    #     change[0][n] = p.to('cpu')
 
     masks = {}
     for t,ncla in args.taskcla:
@@ -78,15 +80,16 @@ def run(args, run_id):
         #    res_task = train(args, net, t, dataset[t], criterion, device)
         
         res_task = prueba2(args, net, t, dataset[t], criterion, device, memory)
+        # res_task = train_extra(args, net, t, dataset[t], criterion, device)
         total_res[t] = res_task
         print('-'*150)
         print()
 
-        change[t+1] = {}
-        for n,p in net.shared.named_parameters():
-            change[t+1][n] = p.to('cpu') - change[0][n]
+        # change[t+1] = {}
+        # for n,p in net.shared.named_parameters():
+        #     change[t+1][n] = p.to('cpu') - change[0][n]
 
-        masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
+        # masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
 
         for u in range(t+1):
             test_res = test(net, u, dataset[u]['test'], criterion, device)
@@ -99,8 +102,8 @@ def run(args, run_id):
             lss[t, u] = test_res[1]
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
-    torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
-            'masks/{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
+    # torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
+    #         'masks/{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
     return avg_acc, gem_bwt, total_res
 
 def main(args):
@@ -146,6 +149,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='./configs/config_mnist5.yml')
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
+    parser.add_argument('--prob-use-mem', type=float, default=-1.0)
+    parser.add_argument('--mem_size', type=int, default=-1)
     
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
@@ -154,6 +159,10 @@ if __name__ == '__main__':
         args.mini_tasks = flags.mini_tasks
     if flags.inner_loop >= 0:
         args.inner_loop = flags.inner_loop
+    if flags.prob_use_mem >= 0:
+        args.prob_use_mem = flags.prob_use_mem
+    if flags.mem_size >= 0:
+        args.mem_size = flags.mem_size
 
     # for m_task in [1,5,10,20,30,40]:
     #     for i_loop in [1,5,10,20,35,50]:
