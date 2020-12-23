@@ -150,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
     parser.add_argument('--prob-use-mem', type=float, default=-1.0)
-    parser.add_argument('--mem_size', type=int, default=-1)
+    parser.add_argument('--mem-size', type=int, default=-1)
     
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
