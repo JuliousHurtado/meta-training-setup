@@ -435,7 +435,7 @@ class Net(nn.Module):
         return self.head[task_id](x), reg_loss
 
     def forward3(self, x, task_id, inputs_feats):
-        if self.private.use_resnet:
+        if self.args.resnet18:
             x_p = inputs_feats
         else:
             x_p = x.clone()

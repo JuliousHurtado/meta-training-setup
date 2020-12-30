@@ -500,18 +500,23 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
         opti_shared_task = optim.SGD(params, args.lr_meta, weight_decay=0.1, momentum=0.9)
         # opti_shared_task = getOptimizer(args.shad_meta, args.priv_meta, args.priv_l_meta, args.head_meta, t_net, args.lr_meta, task_id)
         
+        try:
+            batch = next(iter_data_train)
+        except:
+            iter_data_train = iter(loader)
+            batch = next(iter_data_train)
+
         prob = random.uniform(0, 1)
         if args.use_memory and prob < args.prob_use_mem and task_id > 0:
             task_key = random.sample(memory.keys(), 1)[0]
-            batch = random.sample(memory[task_key], 1)[0]
+            batch_mem = random.sample(memory[task_key], 1)[0]
             batch_task_id = task_key
+            if t_net.private.use_resnet:
+                batch[2] = batch_mem[2].clone()
+            else:
+                batch[2] = batch_mem[0].clone()
+                t_net.args.resnet18 = True
         else:
-            try:
-                batch = next(iter_data_train)
-            except:
-                iter_data_train = iter(loader)
-                batch = next(iter_data_train)
-
             if task_id not in memory:
                 memory[task_id] = []
 
@@ -520,13 +525,13 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
                 memory[task_id].append(batch)
             elif prob < 0.7:
                 idex = random.sample(list(range(len(memory[task_id]))), 1)[0]
-                memory[task_id][idex] = batch
+                memory[task_id][idex] = batch.clone()
 
             batch_task_id = task_id
 
-        temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, batch_task_id, device) 
-        loss_mini_task += temp_loss
+        temp_loss, acc_mini = trainBatchPrueba(t_net, opti_shared_task, criterion, batch, args.inner_loop, batch_task_id, device)
 
+        loss_mini_task += temp_loss
         grads_acc['grads'].append(get_diff_weights(net, t_net))
         
         # try:
@@ -759,7 +764,6 @@ def prueba2(args, net, task_id, dataloader, criterion, device, memory):
         else:
             meta_acc, meta_loss = trainShared(args, net, dataloader['train'], task_id, opti_shared, criterion, net.forward5, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
-
 
     if args.only_shared:
         params = []
