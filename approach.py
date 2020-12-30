@@ -525,7 +525,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
                 memory[task_id].append(batch)
             elif prob < 0.7:
                 idex = random.sample(list(range(len(memory[task_id]))), 1)[0]
-                memory[task_id][idex] = batch.clone()
+                memory[task_id][idex] = copy.deepcopy(batch)
 
             batch_task_id = task_id
 
