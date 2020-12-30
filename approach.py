@@ -507,7 +507,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
             batch = next(iter_data_train)
 
         prob = random.uniform(0, 1)
-        if args.use_memory and prob < args.prob_use_mem and task_id > 0:
+        if args.use_memory and prob < args.prob_use_mem and task_id > 0 and batch[0].size(0) == args.batch_size:
             task_key = random.sample(memory.keys(), 1)[0]
             batch_mem = random.sample(memory[task_key], 1)[0]
             batch_task_id = task_key
@@ -522,7 +522,7 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
 
             prob = random.uniform(0, 1)
             if len(memory[task_id]) < args.mem_size and batch[0].size(0) == args.batch_size:
-                memory[task_id].append(batch)
+                memory[task_id].append(copy.deepcopy(batch))
             elif prob < 0.7 and batch[0].size(0) == args.batch_size:
                 idex = random.sample(list(range(len(memory[task_id]))), 1)[0]
                 memory[task_id][idex] = copy.deepcopy(batch)
