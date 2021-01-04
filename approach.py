@@ -543,6 +543,9 @@ def trainTaskPrueba(args, net, loader, task_id, opti_shared, criterion, device, 
         _, acc_mini= trainBatchPrueba(t_net, None, None, batch, 1, task_id, device)
         grads_acc['acc'].append(acc_mini)
 
+        if not t_net.private.use_resnet:
+            t_net.args.resnet18 = False
+
     save_grads = init_grads_out(net)
     weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
     for i, g in enumerate(grads_acc['grads']):
