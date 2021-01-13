@@ -12,7 +12,7 @@ import utils
 
 from models.conv import Net
 from models.hat import HatNet
-from approach import train, test, trainAll, prueba, prueba2, getMasks, train_extra
+from approach import test, training_procedure, train_extra
 
 def run(args, run_id):
     # Args -- Experiment
@@ -47,7 +47,6 @@ def run(args, run_id):
 
     # Model
     net = Net(args, device)
-    # net = HatNet(args.inputsize, args.taskcla)
     net = net.to(device)
 
     criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -73,14 +72,8 @@ def run(args, run_id):
 
         if args.experiment == 'multidatasets':
             args.lr_task = dataloader.lrs[t][1]
-        # Train
-        #if args.train_first and (t == 0 or not (args.use_share and args.use_private)):
-        #    res_task = trainAll(args, net, t, dataset[t], criterion, device)
-        #else:
-        #    res_task = train(args, net, t, dataset[t], criterion, device)
-        
-        res_task = prueba2(args, net, t, dataset[t], criterion, device, memory)
-        # res_task = train_extra(args, net, t, dataset[t], criterion, device)
+
+        res_task = training_procedure(args, net, t, dataset[t], criterion, device, memory)
         total_res[t] = res_task
         print('-'*150)
         print()
@@ -164,8 +157,4 @@ if __name__ == '__main__':
     if flags.mem_size >= 0:
         args.mem_size = flags.mem_size
 
-    # for m_task in [1,5,10,20,30,40]:
-    #     for i_loop in [1,5,10,20,35,50]:
-    #         args.mini_tasks = m_task
-    #         args.inner_loop = i_loop
     main(args)
