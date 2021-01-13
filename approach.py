@@ -208,8 +208,6 @@ def traditional_training(args, net, loader, task_id, opti_shared, criterion, dev
     #print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
     return correct/total, loss/len(loader)
 
-# forward6 and forward5 -> traditional_training
-# forward3 -> meta_batch
 def training_procedure(args, net, task_id, dataloader, criterion, device, memory):
     results = {
         'meta_loss': [],
