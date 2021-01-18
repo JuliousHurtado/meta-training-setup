@@ -86,8 +86,8 @@ def test(net, task_id, dataloader, criterion, device):
 def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device):
     net.eval()
     correct, loss = 0.0, 0.0
-    total = 0
-    total_correct = 0
+    total = 0.0
+    total_correct = 0.0
     pdist = torch.nn.PairwiseDistance(p=args.mask_dist_p)
     for i, batch in enumerate(dataloader):
         inputs = batch[0].to(device)
