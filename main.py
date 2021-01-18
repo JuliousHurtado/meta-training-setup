@@ -12,7 +12,8 @@ import utils
 
 from models.conv import Net
 from models.hat import HatNet
-from approach import test, training_procedure, train_extra
+from approach import test, training_procedure, train_extra, test_task_free
+from utils import get_mem_masks
 
 def run(args, run_id):
     # Args -- Experiment
@@ -58,6 +59,7 @@ def run(args, run_id):
 
     total_res = {}
     memory = {}
+    memory_masks = {}
     change = { 0: {} }
 
     # for n,p in net.shared.named_parameters():
@@ -83,10 +85,13 @@ def run(args, run_id):
         #     change[t+1][n] = p.to('cpu') - change[0][n]
 
         # masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
+        memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
 
         for u in range(t+1):
-            test_res = test(net, u, dataset[u]['test'], criterion, device)
-
+            if args.test_task_free:
+                test_res = test_task_free(args, net, u, memory_masks, dataset[u]['test'], criterion, device)
+            else:
+                test_res = test(net, u, dataset[u]['test'], criterion, device)
             print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u+1, dataset[u]['name'],
                                                                                           test_res[1],
                                                                                           test_res[0]))
@@ -144,6 +149,9 @@ if __name__ == '__main__':
     parser.add_argument('--inner-loop', type=int, default=-1)
     parser.add_argument('--prob-use-mem', type=float, default=-1.0)
     parser.add_argument('--mem-size', type=int, default=-1)
+    parser.add_argument('--num-masks', type=int, default=-1)
+    parser.add_argument('--dist-masks', type=str, default='cosine')
+    parser.add_argument('--mask-dist-p', type=int, default=-1)
     
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
@@ -156,5 +164,12 @@ if __name__ == '__main__':
         args.prob_use_mem = flags.prob_use_mem
     if flags.mem_size >= 0:
         args.mem_size = flags.mem_size
+
+    # Task-Free conditions
+    if flags.num_masks >= 0:
+        args.num_masks = flags.num_masks
+    if flags.mask_dist_p >= 0:
+        args.mask_dist_p = flags.mask_dist_p
+    args.dist_masks = flags.dist_masks
 
     main(args)

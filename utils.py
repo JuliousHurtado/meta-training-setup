@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pickle
+import random
 
 import torch
 
@@ -110,13 +111,73 @@ def getMasks(net, task_id, dataloader, device):
         m_all['labels'].extend(labels)
         masks = net.get_masks(inputs, task_id, inputs_feats)
 
-        for i, m in enumerate(masks):
-            if i not in m_all['masks']:
-                m_all['masks'][i] = []
+        for j, m in enumerate(masks):
+            if j not in m_all['masks']:
+                m_all['masks'][j] = []
 
-            m_all['masks'][i].extend(m[0].squeeze().tolist())
+            m_all['masks'][j].extend(m[0].squeeze().tolist())
 
     return m_all
+
+def get_mem_masks(args, net, task_id, dataloader, device):
+    m_all = {'masks': {}, 'labels': []}
+    for i, batch in enumerate(dataloader):
+        inputs = batch[0].to(device)
+        labels = batch[1]
+        inputs_feats = batch[2].to(device)
+
+        m_all['labels'].extend(labels.tolist())
+        masks = net.get_masks(inputs, task_id, inputs_feats)
+
+        for j,layer in enumerate(masks):
+            if j not in m_all['masks']:
+                m_all['masks'][j] = []
+            m_all['masks'][j].extend(layer[0].squeeze().tolist())
+
+    t_masks = {}
+    for i, k in enumerate(m_all['masks']):
+        t_masks[k] = torch.stack([ torch.tensor(m).to(device) for m in m_all['masks'][k] ]).to(device)
+
+    masks = []
+    if args.mask_per_class:
+        classes = list(set(m_all['labels']))
+        t_labels = torch.tensor(m_all['labels']).to(device)
+
+        b_masks = []
+        for clss in classes:
+            b_masks.append( torch.arange(0, len(m_all['labels'])).to(device)[t_labels == clss] )
+
+        if args.mask_select == 'random':
+            for elem in b_masks:
+                indxs = random.sample(list(range(elem.size(0))), args.num_masks)
+                for idx in indxs:
+                    mask = []
+                    for k in t_masks:
+                        mask.append(t_masks[k][idx])
+                    masks.append(mask)
+            
+        else:
+            for elem in b_masks:
+                mask = []
+                for k in t_masks:
+                    mask.append(t_masks[k][elem].mean(dim=0))
+                masks.append(mask)
+
+    else:
+        if args.mask_select == 'random':
+            indxs = random.sample(list(range(len(m_all['labels']))), args.num_masks)
+            for idx in indxs:
+                mask = []
+                for k in t_masks:
+                    mask.append(t_masks[k][idx])
+                masks.append(mask)
+        else:
+            mask = []
+            for k in t_masks:
+                mask.append(t_masks[k].mean(dim=0))
+            masks.append(mask)
+
+    return masks
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0

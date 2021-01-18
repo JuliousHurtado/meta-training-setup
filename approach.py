@@ -3,6 +3,7 @@ import numpy as np
 import random
 
 import torch
+import torch.nn.functional as F
 from torch import optim
 
 from utils import init_grads_out, get_diff_weights, set_grads, printSum
@@ -79,6 +80,56 @@ def test(net, task_id, dataloader, criterion, device):
         loss += l.item()
 
         total += inputs.size(0)
+    net.train()
+    return correct/total, loss/len(dataloader)
+
+def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device):
+    net.eval()
+    correct, loss = 0.0, 0.0
+    total = 0
+    total_correct = 0
+    pdist = torch.nn.PairwiseDistance(p=args.mask_dist_p)
+    for i, batch in enumerate(dataloader):
+        inputs = batch[0].to(device)
+        labels = batch[1].to(device)
+        inputs_feats = batch[2].to(device)
+
+        diff_masks = (torch.ones(len(mem_masks.keys()), inputs.size(0)).to(device))*1e5
+        for k in mem_masks: #per taks already trained
+            masks = net.get_masks(inputs, k, inputs_feats)
+
+            for m in mem_masks[k]: #per masks in memory
+                dist = torch.zeros(inputs.size(0)).to(device)
+                for l,_ in enumerate(m): #per layer of masks
+                    if args.mask_binary:
+                        used_mem = ( m[l] > args.min_value_mask)
+        
+                        if args.dist_masks == 'cosine':
+                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))
+                        else:
+                            dist += pdist(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem])/used_mem.size(0)
+                    else:
+                        if args.dist_masks == 'cosine':
+                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))
+                        else:
+                            dist += pdist(m[l].unsqueeze(0),masks[l][0].squeeze())/m[l].size(0)
+
+                diff_masks[k][( dist < diff_masks[k] )] = dist[( dist < diff_masks[k] )]
+
+        m_correct = ( torch.argmin(diff_masks, dim=0) == task_id )
+        print(m_correct.sum())
+
+        total_correct += m_correct.sum()
+        outs, _ = net(inputs, task_id, inputs_feats)
+        _, preds = outs.max(1)
+
+        correct += preds[m_correct].eq(labels[m_correct].view_as(preds[m_correct])).sum().item()
+
+        l = criterion(outs, labels) 
+        loss += l.item()
+
+        total += inputs.size(0)
+    print(correct/total_correct)
     net.train()
     return correct/total, loss/len(dataloader)
 
