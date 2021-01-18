@@ -8,28 +8,31 @@ data_dir: "/mnt/nas2/GrimaRepo/datasets"
 checkpoint: "./checkpoints/"
 # Experiment
 num_runs: 1
-ntasks: 100
+ntasks: 20
 n_channels: 3
 workers: 0
 seed: 48
 #Train
-epochs: 1 #20
-feats_epochs: 5 #20
-meta_epochs: 5 #5
+epochs: 20
+feats_epochs: 20
+meta_epochs: 10
 epochs_inner_task: 1
 batch_size: 128
 pc_valid: 0.15
 lr_meta: 0.01
 lr_task: 0.01
+
 #Model
 head_units: 64
 latent_dim: 128
 resnet18: False
 resnet_pre_trained: True
+
 #Meta
 use_meta: True
 mini_tasks: 20
-inner_loop: 5
+inner_loop: 20
+
 #Optimizer
 shad_meta: True
 priv_meta: False
@@ -77,7 +80,7 @@ only_shared: False
 
 
 # Memory
-use_memory: True
+use_memory: False
 prob_use_mem: 0.5
 mem_size: 20
 
