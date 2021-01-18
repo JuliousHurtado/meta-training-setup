@@ -26,6 +26,8 @@ def run(args, run_id):
         from dataloaders import miniimagenet as datagenerator
     elif args.experiment=='multidatasets':
         from dataloaders import mulitidatasets as datagenerator
+    elif args.experiment=='imagenet':
+        from dataloaders import imagenet as datagenerator
     else:
         raise NotImplementedError
 
