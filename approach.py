@@ -62,7 +62,7 @@ def train_representation(args, net, dataloader, task_id, criterion, device):
     for p in net.private.conv[task_id].parameters():
         p.requires_grad = False
 
-def test(net, task_id, dataloader, criterion, device):
+def test(net, task_id, dataloader, criterion, device, task_pri = None):
     net.eval()
     correct, loss = 0.0, 0.0
     total = 0
@@ -71,7 +71,7 @@ def test(net, task_id, dataloader, criterion, device):
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        outs, _ = net(inputs, task_id, inputs_feats)
+        outs, _ = net(inputs, task_id, inputs_feats, task_pri=task_pri)
         _, preds = outs.max(1)
 
         correct += preds.eq(labels.view_as(preds)).sum().item()

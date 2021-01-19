@@ -244,15 +244,17 @@ class Net(nn.Module):
                     ))
 
 
-    def forward(self, x, task_id, inputs_feats, shared_clf = False):
+    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None):
         if self.only_shared:
             m_p = None
         else:
+            if task_pri is None:
+                task_pri = task_id
             if self.args.resnet18:
                 x_p = inputs_feats
             else:
                 x_p = x.clone()
-            m_p, x_p = self.private(x_p, task_id)
+            m_p, x_p = self.private(x_p, task_pri)
 
         x_s = self.shared(x.clone(), m_p)
 
@@ -262,6 +264,8 @@ class Net(nn.Module):
             pred = self.head[task_id](x_s)
 
         return pred, 0
+
+
 
     def print_model_size(self):
         if self.use_private:
