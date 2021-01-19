@@ -85,7 +85,8 @@ def run(args, run_id):
         #     change[t+1][n] = p.to('cpu') - change[0][n]
 
         # masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
-        memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
+        if args.test_task_free:
+            memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
 
         for u in range(t+1):
             if args.test_task_free:
