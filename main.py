@@ -27,6 +27,8 @@ def run(args, run_id):
         from dataloaders import miniimagenet as datagenerator
     elif args.experiment=='multidatasets':
         from dataloaders import mulitidatasets as datagenerator
+    elif args.experiment=='imagenet':
+        from dataloaders import imagenet as datagenerator
     else:
         raise NotImplementedError
 
@@ -150,10 +152,12 @@ if __name__ == '__main__':
     parser.add_argument('--inner-loop', type=int, default=-1)
     parser.add_argument('--prob-use-mem', type=float, default=-1.0)
     parser.add_argument('--mem-size', type=int, default=-1)
+
     parser.add_argument('--num-masks', type=int, default=-1)
     parser.add_argument('--dist-masks', type=str, default='cosine')
     parser.add_argument('--mask-dist-p', type=int, default=-1)
-    
+    parser.add_argument('--ntasks', type=int, default=-1)
+
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
 
@@ -165,6 +169,8 @@ if __name__ == '__main__':
         args.prob_use_mem = flags.prob_use_mem
     if flags.mem_size >= 0:
         args.mem_size = flags.mem_size
+    if flags.ntasks >= 0:
+        args.ntasks = flags.ntasks
 
     # Task-Free conditions
     if flags.num_masks >= 0:
@@ -174,3 +180,4 @@ if __name__ == '__main__':
     args.dist_masks = flags.dist_masks
 
     main(args)
+

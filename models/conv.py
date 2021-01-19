@@ -93,11 +93,17 @@ class Private(nn.Module):
             elif args.experiment == 'multidatasets':
                 hiddens=[32,32]
                 flatten=1152
+                
+            elif args.experiment == 'imagenet':
+                hiddens = [64,128,256,512]
+                flatten = 512
 
             self.ncha,self.size,_=args.inputsize
 
 
             self.conv = torch.nn.ModuleList()
+            
+
             for _ in range(self.num_tasks):
                 layer = torch.nn.Sequential()
                 layer.add_module('conv1',nn.Conv2d(self.ncha, hiddens[0], kernel_size=self.size // 8))
@@ -110,12 +116,21 @@ class Private(nn.Module):
                 layer.add_module('relu2', nn.ReLU(inplace=True))
                 # layer.add_module('dropout2', nn.Dropout(0.5))
                 layer.add_module('maxpool2', nn.MaxPool2d(2))
+                if args.experiment == "imagenet":
+                    layer.add_module('conv3', nn.Conv2d(hiddens[1], hiddens[2], kernel_size=3))
+                    layer.add_module('bn3', nn.BatchNorm2d(hiddens[2]))
+                    layer.add_module('relu3', nn.ReLU(inplace=True))
+                    layer.add_module('maxpool3', nn.MaxPool2d(2))
+                    layer.add_module('conv4', nn.Conv2d(hiddens[2], hiddens[3], kernel_size=3))
+                    layer.add_module('bn4', nn.BatchNorm2d(hiddens[3]))
+                    layer.add_module('relu4', nn.ReLU(inplace=True))
+                    layer.add_module('maxpool4', nn.MaxPool2d(2))
+                    layer.add_module('globavgpool2d', nn.AdaptiveAvgPool2d((1,1)))
                 layer.add_module('flatten', nn.Flatten())
                 layer.add_module('linear1', nn.Linear(flatten,self.dim_embedding))
                 layer.add_module('relu3', nn.ReLU(inplace=True))
                 #layer.add_module('drop', nn.Dropout(0.5))
                 self.conv.append(layer)
-
             self.num_ftrs = self.dim_embedding
 
         self.linear = nn.ModuleList()
@@ -148,25 +163,12 @@ class Private(nn.Module):
             x = self.feat_extraction(x).squeeze()
         else:
             x = self.conv[task_id](x)
-            # x = self.avgpool(x).squeeze()
-            #x = self.conv[task_id](x).squeeze().view(x.size(0),self.num_ftrs)
         
         for i in range(self.layers):
             film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
             m.append([
                 film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
                 ])
-        # film_vector = self.linear[task_id][0](x.clone()).view(
-        #     x.size(0), -1, self.hiddens[-1])
-        # m.append([
-        #         film_vector[:,0,:self.hiddens[0]].unsqueeze(2).unsqueeze(3),
-        #         film_vector[:,1,:self.hiddens[0]].unsqueeze(2).unsqueeze(3),
-        #         ])
-        # for i in range(1,self.layers):
-        #     m.append([
-        #         film_vector[:,0,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
-        #         film_vector[:,1,self.hiddens[i-1]:self.hiddens[i]].unsqueeze(2).unsqueeze(3),
-        #         ])
 
         if self.use_em:
             x = self.last_em[task_id](x)
@@ -198,7 +200,9 @@ class Net(nn.Module):
 
         elif args.experiment == 'mnist5' or args.experiment == 'pmnist':
             hiddens = [32, 64, 128, 256, 256]
-
+            
+        elif args.experiment == 'imagenet':
+            hiddens = [64, 128, 256, 512, 512]
         else:
             raise NotImplementedError
 
