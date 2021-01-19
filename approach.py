@@ -105,12 +105,12 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
                         used_mem = ( m[l] > args.min_value_mask)
         
                         if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))
+                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))*m[l].size(0)
                         else:
                             dist += pdist(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem])/used_mem.size(0)
                     else:
                         if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))
+                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))*m[l].size(0)
                         else:
                             dist += pdist(m[l].unsqueeze(0),masks[l][0].squeeze())/m[l].size(0)
 

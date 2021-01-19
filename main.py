@@ -93,7 +93,7 @@ def run(args, run_id):
         for u in range(t+1):
             if args.use_last_pri:
                 test_res = test(net, u, dataset[u]['test'], criterion, device, t)
-            if args.test_task_free:
+            elif args.test_task_free:
                 test_res = test_task_free(args, net, u, memory_masks, dataset[u]['test'], criterion, device)
             else:
                 test_res = test(net, u, dataset[u]['test'], criterion, device)

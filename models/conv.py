@@ -250,10 +250,12 @@ class Net(nn.Module):
         else:
             if task_pri is None:
                 task_pri = task_id
+                
             if self.args.resnet18:
                 x_p = inputs_feats
             else:
                 x_p = x.clone()
+
             m_p, x_p = self.private(x_p, task_pri)
 
         x_s = self.shared(x.clone(), m_p)
