@@ -71,7 +71,7 @@ def get_diff_weights(old_net, new_net, device='cuda'):
     grads = {}
 
     for (_,p_new),(n,p_old) in zip(new_net.shared.named_parameters(), old_net.shared.named_parameters()):
-        grads[n] = (p_new - p_old).to('cpu')
+        grads[n] = (p_new.to('cpu') - p_old.to('cpu'))
 
     return grads 
 

@@ -240,13 +240,13 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
         if not t_net.private.use_resnet:
             t_net.args.resnet18 = False
 
+    net.to(device)
     save_grads = init_grads_out(net)
     weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
     for i, g in enumerate(grads_acc['grads']):
         for n in g:
             save_grads[n] += g[n].to(device)*weights[i]/(args.inner_loop+args.mini_tasks)
 
-    net.to(device)
     set_grads(net, save_grads, task_id)
     opti_shared.step()
     opti_shared.zero_grad()
