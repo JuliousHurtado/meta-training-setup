@@ -95,8 +95,8 @@ class Private(nn.Module):
                 flatten=1152
                 
             elif args.experiment == 'imagenet':
-                hiddens = [64,128,256,512]
-                flatten = 512
+                hiddens = [64,128,256,256]
+                flatten = 256
 
             self.ncha,self.size,_=args.inputsize
 
@@ -250,7 +250,7 @@ class Net(nn.Module):
         else:
             if task_pri is None:
                 task_pri = task_id
-                
+
             if self.args.resnet18:
                 x_p = inputs_feats
             else:

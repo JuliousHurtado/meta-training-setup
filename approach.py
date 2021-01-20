@@ -94,7 +94,8 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        diff_masks = (torch.ones(len(mem_masks.keys()), inputs.size(0)).to(device))*1e5
+        # diff_masks = (torch.ones(len(mem_masks.keys()), inputs.size(0)).to(device))*1e5
+        diff_masks = (torch.zeros(len(mem_masks.keys()), inputs.size(0)).to(device))
         for k in mem_masks: #per taks already trained
             masks = net.get_masks(inputs, k, inputs_feats)
 
@@ -103,18 +104,23 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
                 for l,_ in enumerate(m): #per layer of masks
                     if args.mask_binary:
                         used_mem = ( m[l] > args.min_value_mask)
-        
+                        masks[l][0][ ( masks[l][0] < args.min_value_mask ) ] = 0.0
+
                         if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))*m[l].size(0)
+                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))#*m[l].size(0)
+                        elif args.dist_masks == 'binary':
+                            used_mask = ( masks[l][0] > args.min_value_mask ).float().squeeze()
+                            dist += pdist(used_mem.unsqueeze(0).float(), used_mask)
                         else:
                             dist += pdist(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem])/used_mem.size(0)
                     else:
                         if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))*m[l].size(0)
+                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))#*m[l].size(0)
                         else:
                             dist += pdist(m[l].unsqueeze(0),masks[l][0].squeeze())/m[l].size(0)
 
-                diff_masks[k][( dist < diff_masks[k] )] = dist[( dist < diff_masks[k] )]
+                # diff_masks[k][( dist < diff_masks[k] )] = dist[( dist < diff_masks[k] )]
+                diff_masks[k] += dist
 
         m_correct = ( torch.argmin(diff_masks, dim=0) == task_id )
         print(m_correct.sum())
