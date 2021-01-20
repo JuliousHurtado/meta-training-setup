@@ -115,13 +115,13 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
                         mask2 = masks[l][0].squeeze().clone()
 
                     if args.dist_masks == 'cosine':
-                        dist += (1 - F.cosine_similarity(mask1.unsqueeze(0),mask2))
+                        dist += (1 - F.cosine_similarity(mask1,mask2))
 
                     elif args.dist_masks == 'pdist':
-                        dist += pdist(mask1.unsqueeze(0),mask2)/mask1.size(0)
+                        dist += pdist(mask1,mask2)/mask1.size(0)
 
                     elif args.dist_masks == 'diff':
-                        dist += (mask1.unsqueeze(0) - mask2).abs().sum(dim=1)/mask1.size(0)
+                        dist += (mask1 - mask2).abs().sum(dim=1)/mask1.size(0)
 
                     else:
                         assert False, "Metric distance {} not implemented".format(args.dist_masks)
