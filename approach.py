@@ -186,8 +186,9 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
     grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
+    net.to('cpu')
     for k in range(args.mini_tasks):
-        t_net = copy.deepcopy(net)
+        t_net = copy.deepcopy(net).to(device)
         t_net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
 
         params = []
@@ -245,6 +246,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
         for n in g:
             save_grads[n] += g[n].to(device)*weights[i]/(args.inner_loop+args.mini_tasks)
 
+    net.to(device)
     set_grads(net, save_grads, task_id)
     opti_shared.step()
     opti_shared.zero_grad()
