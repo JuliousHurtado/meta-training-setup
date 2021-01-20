@@ -94,35 +94,46 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        # diff_masks = (torch.ones(len(mem_masks.keys()), inputs.size(0)).to(device))*1e5
-        diff_masks = (torch.zeros(len(mem_masks.keys()), inputs.size(0)).to(device))
-        for k in mem_masks: #per taks already trained
+        diff_masks = [] 
+        #per taks already trained
+        for k in mem_masks: 
             masks = net.get_masks(inputs, k, inputs_feats)
 
-            for m in mem_masks[k]: #per masks in memory
+            diff_task = None 
+            #per element in memory
+            for m in mem_masks[k]: 
                 dist = torch.zeros(inputs.size(0)).to(device)
-                for l,_ in enumerate(m): #per layer of masks
+
+                #per layer of masks
+                for l,mask in enumerate(m):
                     if args.mask_binary:
                         used_mem = ( m[l] > args.min_value_mask)
-                        masks[l][0][ ( masks[l][0] < args.min_value_mask ) ] = 0.0
-
-                        if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem]))#*m[l].size(0)
-                        elif args.dist_masks == 'binary':
-                            used_mask = ( masks[l][0] > args.min_value_mask ).float().squeeze()
-                            dist += pdist(used_mem.unsqueeze(0).float(), used_mask)
-                        else:
-                            dist += pdist(m[l][used_mem].unsqueeze(0),masks[l][0].squeeze()[:,used_mem])/used_mem.size(0)
+                        mask1 = m[l][used_mem].clone()
+                        mask2 = masks[l][0].squeeze()[:,used_mem.squeeze()].clone()
                     else:
-                        if args.dist_masks == 'cosine':
-                            dist += (1 - F.cosine_similarity(m[l].unsqueeze(0),masks[l][0].squeeze()))#*m[l].size(0)
-                        else:
-                            dist += pdist(m[l].unsqueeze(0),masks[l][0].squeeze())/m[l].size(0)
+                        mask1 = m[l].clone()
+                        mask2 = masks[l][0].squeeze().clone()
 
-                # diff_masks[k][( dist < diff_masks[k] )] = dist[( dist < diff_masks[k] )]
-                diff_masks[k] += dist
+                    if args.dist_masks == 'cosine':
+                        dist += (1 - F.cosine_similarity(mask1.unsqueeze(0),mask2))
 
-        m_correct = ( torch.argmin(diff_masks, dim=0) == task_id )
+                    elif args.dist_masks == 'pdist':
+                        dist += pdist(mask1.unsqueeze(0),mask2)/mask1.size(0)
+
+                    elif args.dist_masks == 'diff':
+                        dist += (mask1.unsqueeze(0) - mask2).abs().sum(dim=1)/mask1.size(0)
+
+                    else:
+                        assert False, "Metric distance {} not implemented".format(args.dist_masks)
+
+                if diff_task is None:
+                    diff_task = dist.clone()
+                else:
+                    diff_task[( dist < diff_task )] = dist[( dist < diff_task )].clone()
+
+            diff_masks.append(diff_task)
+
+        m_correct = ( torch.argmin(torch.stack(diff_masks), dim=0) == task_id )
         print(m_correct.sum())
 
         total_correct += m_correct.sum()
