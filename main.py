@@ -156,7 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('--mem-size', type=int, default=-1)
 
     parser.add_argument('--num-masks', type=int, default=-1)
-    # parser.add_argument('--dist-masks', type=str, default='cosine')
+    parser.add_argument('--dist-masks', type=str, default='')
     parser.add_argument('--mask-dist-p', type=int, default=-1)
     parser.add_argument('--ntasks', type=int, default=-1)
 
@@ -179,7 +179,8 @@ if __name__ == '__main__':
         args.num_masks = flags.num_masks
     if flags.mask_dist_p >= 0:
         args.mask_dist_p = flags.mask_dist_p
-    # args.dist_masks = flags.dist_masks
+    if flags.dist_masks != '':
+        args.dist_masks = flags.dist_masks
 
     main(args)
 
