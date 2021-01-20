@@ -13,7 +13,7 @@ import utils
 from models.conv import Net
 from models.hat import HatNet
 from approach import test, training_procedure, train_extra, test_task_free
-from utils import get_mem_masks
+from utils import get_mem_masks, getMasks
 
 def run(args, run_id):
     # Args -- Experiment
@@ -67,7 +67,7 @@ def run(args, run_id):
     # for n,p in net.shared.named_parameters():
     #     change[0][n] = p.to('cpu')
 
-    masks = {}
+    masks = {'train': {}, 'test': {}}
     for t,ncla in args.taskcla:
         print('*'*150)
         dataset = dataloader.get(t)
@@ -86,7 +86,9 @@ def run(args, run_id):
         # for n,p in net.shared.named_parameters():
         #     change[t+1][n] = p.to('cpu') - change[0][n]
 
-        # masks[t+1] = getMasks(net, t, dataset[t]['train'], device)
+        if args.get_masks:
+            masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
+            masks['test'][t] = getMasks(net, t, dataset[t]['test'], device)
         if args.test_task_free:
             memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
 
@@ -105,8 +107,9 @@ def run(args, run_id):
             lss[t, u] = test_res[1]
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
-    # torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
-    #         'masks/{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
+    if args.get_masks:
+        torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
+            'masks/{}_{}_{}_{}_for_task_free.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
     return avg_acc, gem_bwt, total_res
 
 def main(args):
