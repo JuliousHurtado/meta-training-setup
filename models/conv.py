@@ -331,7 +331,7 @@ class Net(nn.Module):
         if self.private.use_resnet:
             x = self.private.feat_extraction(x_p).squeeze()
         else:
-            if self.one_representation:
+            if self.private.one_representation:
                 x = self.conv[0](x)
             else:
                 x = self.private.conv[task_id](x_p)

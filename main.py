@@ -117,7 +117,7 @@ def run(args, run_id):
 
     if args.get_masks:
         torch.save({ 'change_param': change, 'mean_mask': masks, 'feats': feats, 'args': args }, 
-                'masks/{}_{}_{}_{}_for_task_free.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
+                'masks/{}_{}_{}_{}_for_task_free_feats.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res
