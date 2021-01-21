@@ -71,6 +71,11 @@ class Private(nn.Module):
         self.dim_embedding = args.latent_dim
         self.num_tasks = args.ntasks
         self.use_em = args.con_pri_shd
+        self.one_representation = args.use_one_representation
+
+        if args.use_one_representation:
+            self.num_tasks = 1
+
 
         if self.use_resnet:
             resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
@@ -162,7 +167,10 @@ class Private(nn.Module):
         if self.use_resnet:
             x = self.feat_extraction(x).squeeze()
         else:
-            x = self.conv[task_id](x)
+            if self.one_representation:
+                x = self.conv[0](x)
+            else:
+                x = self.conv[task_id](x)
         
         for i in range(self.layers):
             film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
