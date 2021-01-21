@@ -173,6 +173,20 @@ def get_mem_masks(args, net, task_id, dataloader, device):
     net.train()
     return t_masks
 
+def get_feature(net, task_id, dataloader, device):
+    f_all = {'feats': [], 'labels': []}
+    net.eval()
+    for i, batch in enumerate(dataloader):
+        inputs = batch[0].to(device)
+        labels = batch[1]
+        inputs_feats = batch[2].to(device)
+
+        f_all['labels'].extend(labels.tolist())
+        feats = net.get_features(inputs, task_id, inputs_feats)
+        f_all['feats'].extend(feats.tolist())
+
+    return f_all
+
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0
     for p in net.private.conv[task_id].parameters():

@@ -313,3 +313,16 @@ class Net(nn.Module):
             x_p = x.clone()
         m_p, _ = self.private(x_p, task_id)
         return m_p
+
+    def get_features(self, x, task_id, inputs_feats):
+        if self.private.use_resnet:
+            x_p = inputs_feats
+        else:
+            x_p = x.clone()
+
+        if self.private.use_resnet:
+            x = self.private.feat_extraction(x_p).squeeze()
+        else:
+            x = self.private.conv[task_id](x_p)
+
+        return x
