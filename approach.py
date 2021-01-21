@@ -94,46 +94,68 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
         labels = batch[1].to(device)
         inputs_feats = batch[2].to(device)
 
-        diff_masks = [] 
-        #per taks already trained
-        for k in mem_masks: 
-            masks = net.get_masks(inputs, k, inputs_feats)
+        diff_task = []
+        for k in mem_masks.keys(): 
+            mask_batch = {}
+            masks = net.get_masks(inputs.clone(), k, inputs_feats.clone())
 
-            diff_task = None 
-            #per element in memory
-            for m in mem_masks[k]: 
-                dist = torch.zeros(inputs.size(0)).to(device)
+            for j,layer in enumerate(masks):
+                if j not in mask_batch:
+                    mask_batch[j] = []
+                mask_batch[j].extend(layer[0].squeeze())
 
-                #per layer of masks
-                for l,mask in enumerate(m):
-                    if args.mask_binary:
-                        used_mem = ( m[l] > args.min_value_mask)
-                        mask1 = m[l][used_mem].clone()
-                        mask2 = masks[l][0].squeeze()[:,used_mem.squeeze()].clone()
-                    else:
-                        mask1 = m[l].clone()
-                        mask2 = masks[l][0].squeeze().clone()
+            dist = None
+            for i, masks in mask_batch.items():
+                t_masks = torch.stack(masks)
 
-                    if args.dist_masks == 'cosine':
-                        dist += (1 - F.cosine_similarity(mask1,mask2))
-
-                    elif args.dist_masks == 'pdist':
-                        dist += pdist(mask1,mask2)/mask1.size(0)
-
-                    elif args.dist_masks == 'diff':
-                        dist += (mask1 - mask2).abs().sum(dim=1)/mask1.size(0)
-
-                    else:
-                        assert False, "Metric distance {} not implemented".format(args.dist_masks)
-
-                if diff_task is None:
-                    diff_task = dist.clone()
+                d = torch.cdist(t_masks,mem_masks[k][i])
+                if dist is None:
+                    dist = d.clone()
                 else:
-                    diff_task[( dist < diff_task )] = dist[( dist < diff_task )].clone()
+                    dist += d
 
-            diff_masks.append(diff_task)
+            diff_task.append(torch.min(dist, dim=1)[0])
+        print(torch.argmin(torch.stack(diff_task), dim=0))
+        # diff_masks = [] 
+        # #per taks already trained
+        # for k in mem_masks: 
+        #     masks = net.get_masks(inputs, k, inputs_feats)
 
-        m_correct = ( torch.argmin(torch.stack(diff_masks), dim=0) == task_id )
+        #     diff_task = None 
+        #     #per element in memory
+        #     for m in mem_masks[k]: 
+        #         dist = torch.zeros(inputs.size(0)).to(device)
+
+        #         #per layer of masks
+        #         for l,mask in enumerate(m):
+        #             if args.mask_binary:
+        #                 used_mem = ( m[l] > args.min_value_mask)
+        #                 mask1 = m[l][used_mem].clone()
+        #                 mask2 = masks[l][0].squeeze()[:,used_mem.squeeze()].clone()
+        #             else:
+        #                 mask1 = m[l].clone()
+        #                 mask2 = masks[l][0].squeeze().clone()
+
+        #             if args.dist_masks == 'cosine':
+        #                 dist += (1 - F.cosine_similarity(mask1,mask2))
+
+        #             elif args.dist_masks == 'pdist':
+        #                 dist += pdist(mask1,mask2)/mask1.size(0)
+
+        #             elif args.dist_masks == 'diff':
+        #                 dist += (mask1 - mask2).abs().sum(dim=1)/mask1.size(0)
+
+        #             else:
+        #                 assert False, "Metric distance {} not implemented".format(args.dist_masks)
+
+        #         if diff_task is None:
+        #             diff_task = dist.clone()
+        #         else:
+        #             diff_task[( dist < diff_task )] = dist[( dist < diff_task )].clone()
+
+        #     diff_masks.append(diff_task)
+
+        m_correct = ( torch.argmin(torch.stack(diff_task), dim=0) == task_id )
         print(m_correct.sum())
 
         total_correct += m_correct.sum()
