@@ -67,6 +67,7 @@ def run(args, run_id):
     # for n,p in net.shared.named_parameters():
     #     change[0][n] = p.to('cpu')
 
+
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
     for t,ncla in args.taskcla:
@@ -118,6 +119,12 @@ def run(args, run_id):
     if args.get_masks:
         torch.save({ 'change_param': change, 'mean_mask': masks, 'feats': feats, 'args': args }, 
                 'masks/{}_{}_{}_{}_for_task_free_feats.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
+
+    if args.save_model:
+        torch.save({
+                'args': args,
+                'checkpoint': model.state_dict()
+                }, 'models/{}.pth'.format(args.experiment))
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res
