@@ -27,7 +27,7 @@ from utils import *
 
 class ImageNet(torch.utils.data.Dataset):
 
-    def __init__(self, root, classes, memory_classes, memory, task_num, train, transform=None, 
+    def __init__(self, root, classes, task_num, train, transform=None, 
                                         transform_feats=None):
         super(ImageNet, self).__init__()
         if train:
@@ -141,20 +141,12 @@ class DatasetGen(object):
         self.dataloaders[task_id] = {}
         sys.stdout.flush()
 
-        if task_id == 0:
-            memory_classes = None
-            memory=None
-        else:
-            memory_classes = self.task_ids
-            memory = self.task_memory
-
         self.train_set[task_id] = ImageNet(root=self.root, classes=self.task_ids[task_id],
-                                                memory_classes=memory_classes, memory=memory,
                                                 task_num=task_id, train=True, transform=self.transformation,
                                                 transform_feats=self.transformation_feats)
 
-        self.test_set[task_id] = ImageNet(root=self.root, classes=self.task_ids[task_id], memory_classes=None,
-                                        memory=None, task_num=task_id, train=False, transform=self.transformation,
+        self.test_set[task_id] = ImageNet(root=self.root, classes=self.task_ids[task_id], task_num=task_id, 
+                                        train=False, transform=self.transformation,
                                         transform_feats=self.transformation_feats)
 
 
