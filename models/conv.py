@@ -337,3 +337,12 @@ class Net(nn.Module):
                 x = self.private.conv[task_id](x_p)
 
         return x
+
+    def get_mask_from_features(self, x, task_id):
+        m = []
+        for i in range(self.private.layers):
+            film_vector = self.private.linear[task_id][i](x.clone()).view(x.size(0), 1, self.private.hiddens[i])
+            m.append([
+                film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
+                ])
+        return m

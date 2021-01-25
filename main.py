@@ -123,8 +123,8 @@ def run(args, run_id):
     if args.save_model:
         torch.save({
                 'args': args,
-                'checkpoint': model.state_dict()
-                }, 'models/{}.pth'.format(args.experiment))
+                'checkpoint': net.state_dict()
+                }, 'models/{}_resnet_{}.pth'.format(args.experiment, args.resnet18))
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res
