@@ -266,6 +266,9 @@ class Net(nn.Module):
 
             m_p, x_p = self.private(x_p, task_pri)
 
+            if not self.use_mask:
+                m_p = [ [torch.ones_like(m[0])] for m in m_p ]
+
         x_s = self.shared(x.clone(), m_p)
 
         if shared_clf:
@@ -274,8 +277,6 @@ class Net(nn.Module):
             pred = self.head[task_id](x_s)
 
         return pred, 0
-
-
 
     def print_model_size(self):
         if self.use_private:
