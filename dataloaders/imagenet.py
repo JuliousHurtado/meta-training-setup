@@ -109,8 +109,8 @@ class DatasetGen(object):
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
 
-        self.transformation = transforms.Compose([transforms.Resize(256),
-                                        transforms.CenterCrop(224), 
+        self.transformation = transforms.Compose([transforms.Resize(128),
+                                        transforms.CenterCrop(114), 
                                         transforms.ToTensor(), 
                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
