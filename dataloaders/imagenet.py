@@ -105,7 +105,8 @@ class DatasetGen(object):
 
         self.num_samples = args.samples
 
-        self.inputsize = [3,224,224]           # Changed to suit ImageNet
+        #self.inputsize = [3,224,224]           # Changed to suit ImageNet
+        self.inputsize = [3,114,114] 
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
 
