@@ -116,44 +116,6 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
 
             diff_task.append(torch.min(dist, dim=1)[0])
         print(torch.argmin(torch.stack(diff_task), dim=0))
-        # diff_masks = [] 
-        # #per taks already trained
-        # for k in mem_masks: 
-        #     masks = net.get_masks(inputs, k, inputs_feats)
-
-        #     diff_task = None 
-        #     #per element in memory
-        #     for m in mem_masks[k]: 
-        #         dist = torch.zeros(inputs.size(0)).to(device)
-
-        #         #per layer of masks
-        #         for l,mask in enumerate(m):
-        #             if args.mask_binary:
-        #                 used_mem = ( m[l] > args.min_value_mask)
-        #                 mask1 = m[l][used_mem].clone()
-        #                 mask2 = masks[l][0].squeeze()[:,used_mem.squeeze()].clone()
-        #             else:
-        #                 mask1 = m[l].clone()
-        #                 mask2 = masks[l][0].squeeze().clone()
-
-        #             if args.dist_masks == 'cosine':
-        #                 dist += (1 - F.cosine_similarity(mask1,mask2))
-
-        #             elif args.dist_masks == 'pdist':
-        #                 dist += pdist(mask1,mask2)/mask1.size(0)
-
-        #             elif args.dist_masks == 'diff':
-        #                 dist += (mask1 - mask2).abs().sum(dim=1)/mask1.size(0)
-
-        #             else:
-        #                 assert False, "Metric distance {} not implemented".format(args.dist_masks)
-
-        #         if diff_task is None:
-        #             diff_task = dist.clone()
-        #         else:
-        #             diff_task[( dist < diff_task )] = dist[( dist < diff_task )].clone()
-
-        #     diff_masks.append(diff_task)
 
         m_correct = ( torch.argmin(torch.stack(diff_task), dim=0) == task_id )
         print(m_correct.sum())
@@ -312,14 +274,14 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
 
      # Train input representation
     if args.use_one_representation:
-        if task_id == 0 and not args.resnet18:
+        if task_id == 0 and not args.resnet18 and not args.task_embedding:
             train_representation(args, net, dataloader, task_id, criterion, device)
             mask_lr = args.lr_task
         else:
             mask_lr = args.lr_task*0.1
     else:
         if not args.only_shared:
-            if not args.resnet18:
+            if not args.resnet18 and not args.task_embedding:
                 train_representation(args, net, dataloader, task_id, criterion, device)
                 mask_lr = args.lr_task
             else:
@@ -345,6 +307,9 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
     # Learning to Reuse previous knowledge, training mask and classifier
     if not args.only_shared:
         params = []
+        if args.task_embedding:
+            for p in net.private.feat_extraction.parameters():
+                params.append(p)
         for p in net.private.linear[task_id].parameters():
             params.append(p)
         for p in net.head[task_id].parameters():
@@ -384,6 +349,9 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
         print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
     else:
         params = []
+        if args.task_embedding:
+            for p in net.private.feat_extraction.parameters():
+                params.append(p)
         for p in net.private.linear[task_id].parameters():
             params.append(p)
         for p in net.head[task_id].parameters():

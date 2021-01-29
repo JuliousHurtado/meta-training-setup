@@ -66,6 +66,7 @@ class Private(nn.Module):
         super(Private, self).__init__()
 
         self.use_resnet = args.resnet18
+        self.task_embedding = args.task_embedding
         self.layers = layers
         self.hiddens = hiddens
         self.dim_embedding = args.latent_dim
@@ -85,7 +86,9 @@ class Private(nn.Module):
                 p.requires_grad = False
 
             self.num_ftrs = resnet18.fc.in_features
-            
+        elif self.task_embedding:
+            self.feat_extraction = nn.Embedding(args.ntasks, self.dim_embedding)
+            self.num_ftrs = self.dim_embedding
         else:
             if args.experiment == 'cifar100':
                 hiddens=[32,32]
@@ -166,6 +169,11 @@ class Private(nn.Module):
 
         if self.use_resnet:
             x = self.feat_extraction(x).squeeze()
+        elif self.task_embedding:
+            #print(x.device)
+            #print(self.feat_extraction.device)
+            emb = (torch.ones(x.size(0))*task_id).to(x.device).long()
+            x = self.feat_extraction(emb)#.squeeze()
         else:
             if self.one_representation:
                 x = self.conv[0](x)
