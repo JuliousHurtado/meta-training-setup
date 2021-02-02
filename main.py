@@ -13,7 +13,7 @@ import utils
 from models.conv import Net
 from models.hat import HatNet
 from approach import test, training_procedure, train_extra, test_task_free
-from utils import get_mem_masks, getMasks, get_feature
+from utils import get_mem_masks, getMasks, get_feature, set_memory
 
 def run(args, run_id):
     # Args -- Experiment
@@ -84,9 +84,11 @@ def run(args, run_id):
         print('-'*150)
         print()
 
-        change[t+1] = {}
-        for n,p in net.shared.named_parameters():
-            change[t+1][n] = p.to('cpu') - change[0][n]
+        memory[t] = set_memory(args, dataset[t]['train'], ncla)
+
+        # change[t+1] = {}
+        # for n,p in net.shared.named_parameters():
+        #     change[t+1][n] = p.to('cpu') - change[0][n]
 
         # if args.get_masks:
         #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)

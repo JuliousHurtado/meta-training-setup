@@ -76,7 +76,7 @@ def get_diff_weights(old_net, new_net, device='cuda'):
     return grads 
 
 def set_grads(net, save_grads, task_id):
-    for n,p in enumerate(net.shared.named_parameters()):
+    for n,p in net.shared.named_parameters():
         if n in save_grads:
             p.grad = save_grads[n]
     try:
@@ -139,37 +139,6 @@ def get_mem_masks(args, net, task_id, dataloader, device):
     for i, masks in m_all['masks'].items():
         t_masks[i] = torch.stack([ torch.tensor(m).to(device) for m in masks ]).to(device)
 
-    # idx = []
-    # if args.mask_per_class:
-    #     classes = list(set(m_all['labels']))
-    #     t_labels = torch.tensor(m_all['labels']).to(device)
-
-    #     b_masks_cls = []
-    #     for clss in classes:
-    #         b_masks_cls.append( torch.arange(0, len(m_all['labels'])).to(device)[t_labels == clss] )
-
-    #     if args.mask_select == 'random':
-    #         for elem in b_masks_cls:
-    #             idx.extend(random.sample(elem.tolist(), args.num_masks))
-    #     else:
-    #         for elem in b_masks_cls:
-    #             idx.append(elem)
-    # else:
-    #     if args.mask_select == 'random':
-    #         idx.extend(random.sample(list(range(len(m_all['labels']))), args.num_masks))
-    #     else:
-    #         idx.append(torch.arange(0, len(m_all['labels'])))
-
-    # masks = []
-    # for i in idx:
-    #     mask = []
-    #     for k in t_masks:
-    #         if args.mask_select == 'random':
-    #             mask.append(t_masks[k][i].unsqueeze(0))
-    #         else:
-    #             mask.append(t_masks[k][i].mean(dim=0).unsqueeze(0))
-    #     masks.append(mask)
-
     net.train()
     return t_masks
 
@@ -186,6 +155,19 @@ def get_feature(net, task_id, dataloader, device):
         f_all['feats'].extend(feats.tolist())
 
     return f_all
+
+def set_memory(args, dataloader, ncla):
+    idxn = random.sample(range(len(dataloader.dataset)), args.mem_size*ncla)
+    
+    mem = []
+    for i in idxn:
+        elem = dataloader.dataset[i]
+        if args.resnet18:
+            mem.append(elem[2])
+        else:
+            mem.append(elem[0])
+
+    return mem
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0

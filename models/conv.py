@@ -258,14 +258,14 @@ class Net(nn.Module):
                     ))
 
 
-    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None):
+    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None, use_memory = False):
         if self.only_shared:
             m_p = None
         else:
             if task_pri is None:
                 task_pri = task_id
 
-            if self.args.use_memory or self.args.resnet18:
+            if use_memory or self.args.resnet18:
                 x_p = inputs_feats
             else:
                 x_p = x.clone()

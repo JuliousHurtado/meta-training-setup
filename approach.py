@@ -134,12 +134,17 @@ def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device)
     net.train()
     return correct/total, loss/len(dataloader)
 
-def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, device):
+def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device, use_memory):
     running_loss = 0.0
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
     inputs_feats = batch[2].to(device)
+
+    # print("Train")
+    # print(task_id)
+    # print(use_memory)
+    # print(inputs_feats.sum())
 
     if opti is not None:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti,factor=0.5, patience=5, threshold=0.001)
@@ -148,7 +153,7 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, device):
         if opti is not None:
             opti.zero_grad()
 
-        outs, _ = net(inputs, task_id, inputs_feats, True)
+        outs, _ = net(inputs, task_id, inputs_feats, True, task_pri, use_memory = use_memory)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
@@ -156,8 +161,8 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, device):
         if criterion is not None:
             l = criterion(outs, labels.clone())
             l.backward()
-            torch.nn.utils.clip_grad_norm_(net.shared.parameters(),0.5)
-            torch.nn.utils.clip_grad_norm_(net.shared_clf.parameters(),0.5)
+            # torch.nn.utils.clip_grad_norm_(net.shared.parameters(),0.5)
+            # torch.nn.utils.clip_grad_norm_(net.shared_clf.parameters(),0.5)
             running_loss = l.item()
 
         if opti is not None:
@@ -170,7 +175,8 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
     grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
-    net.to('cpu')
+    use_memory = False
+    net#.to('cpu')
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net).to(device)
         t_net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
@@ -180,7 +186,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
             params.append(p)
         for p in t_net.shared_clf.parameters():
             params.append(p)
-        opti_shared_task = optim.SGD(params, args.lr_meta, weight_decay=0.1, momentum=0.9)
+        opti_shared_task = optim.SGD(params, args.lr_meta) #, weight_decay=0.1, momentum=0.9
 
         try:
             batch = next(iter_data_train)
@@ -190,43 +196,41 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
 
         # using memory
         prob = random.uniform(0, 1)
-        if args.use_memory and prob < args.prob_use_mem and task_id > 0 and batch[0].size(0) == args.batch_size:
+        if args.use_memory and prob < args.prob_use_mem and task_id > 0:
             task_key = random.sample(memory.keys(), 1)[0]
-            batch_mem = random.sample(memory[task_key], 1)[0]
+
+            mem = []
+            for i in range(batch[0].size(0)):
+                idx_batch = random.sample(range(len(memory[task_key])), 1)[0]
+                mem.append(memory[task_key][idx_batch])
+
+            batch[2] = torch.stack(mem)
             batch_task_id = task_key
-            if t_net.private.use_resnet:
-                batch[2] = batch_mem[2].clone()
-            else:
-                batch[2] = batch_mem[0].clone()
+            use_memory = True
+
         else:
-            if task_id not in memory:
-                memory[task_id] = []
-
-            prob = random.uniform(0, 1)
-            if len(memory[task_id]) < args.mem_size and batch[0].size(0) == args.batch_size:
-                memory[task_id].append(copy.deepcopy(batch))
-            elif prob < 0.7 and batch[0].size(0) == args.batch_size:
-                idex = random.sample(list(range(len(memory[task_id]))), 1)[0]
-                memory[task_id][idex] = copy.deepcopy(batch)
-
             batch_task_id = task_id
+            use_memory = False
 
-        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, batch_task_id, device)
+        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, batch_task_id, device, use_memory)
 
         loss_mini_task += temp_loss
         grads_acc['grads'].append(get_diff_weights(net, t_net))
        
-        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, device)
+        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, batch_task_id, device, use_memory)
         grads_acc['acc'].append(acc_mini)
 
+    # print(grads_acc['acc'])
     net.to(device)
     save_grads = init_grads_out(net)
     weights = torch.tensor(grads_acc['acc'])/sum(grads_acc['acc'])
+    
     for i, g in enumerate(grads_acc['grads']):
         for n in g:
-            save_grads[n] += g[n].to(device)*weights[i]/(args.inner_loop+args.mini_tasks)
+            save_grads[n] += g[n].to(device)#*weights[i]/(args.mini_tasks)
 
     set_grads(net, save_grads, task_id)
+
     opti_shared.step()
     opti_shared.zero_grad()
 
@@ -327,15 +331,15 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             params.append(p)
     for e in range(args.meta_epochs):
         if args.use_meta:
-            opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
+            opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # *0.1, weight_decay=0.9 
             meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
             opti_shared = optim.SGD(params, args.lr_meta) # 
             meta_acc, meta_loss = traditional_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
-        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
+        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f} Test Acc: {:.4f}\t".format(e+1,args.meta_epochs,meta_acc, meta_loss, acc_valid))
 
-    for k,v in memory.keys():
-        
+
 
     # Consolidating Knowledge
     if args.only_shared:
