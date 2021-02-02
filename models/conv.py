@@ -170,10 +170,8 @@ class Private(nn.Module):
         if self.use_resnet:
             x = self.feat_extraction(x).squeeze()
         elif self.task_embedding:
-            #print(x.device)
-            #print(self.feat_extraction.device)
             emb = (torch.ones(x.size(0))*task_id).to(x.device).long()
-            x = self.feat_extraction(emb)#.squeeze()
+            x = self.feat_extraction(emb)
         else:
             if self.one_representation:
                 x = self.conv[0](x)
