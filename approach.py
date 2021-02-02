@@ -186,7 +186,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
             params.append(p)
         for p in t_net.shared_clf.parameters():
             params.append(p)
-        opti_shared_task = optim.SGD(params, args.lr_meta) #, weight_decay=0.1, momentum=0.9
+        opti_shared_task = optim.SGD(params, args.lr_meta, weight_decay=0.1, momentum=0.9) #
 
         try:
             batch = next(iter_data_train)
@@ -331,7 +331,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             params.append(p)
     for e in range(args.meta_epochs):
         if args.use_meta:
-            opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # *0.1, weight_decay=0.9 
+            opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.4) # *0.1, weight_decay=0.9 
             meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
             opti_shared = optim.SGD(params, args.lr_meta) # 
