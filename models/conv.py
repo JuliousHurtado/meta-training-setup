@@ -265,7 +265,7 @@ class Net(nn.Module):
             if task_pri is None:
                 task_pri = task_id
 
-            if self.args.resnet18:
+            if self.args.use_memory or self.args.resnet18:
                 x_p = inputs_feats
             else:
                 x_p = x.clone()

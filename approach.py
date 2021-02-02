@@ -198,8 +198,6 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
                 batch[2] = batch_mem[2].clone()
             else:
                 batch[2] = batch_mem[0].clone()
-                #To make it easy the use of memory, but it not use resnet
-                t_net.args.resnet18 = True
         else:
             if task_id not in memory:
                 memory[task_id] = []
@@ -220,9 +218,6 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
        
         _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, device)
         grads_acc['acc'].append(acc_mini)
-
-        if not t_net.private.use_resnet:
-            t_net.args.resnet18 = False
 
     net.to(device)
     save_grads = init_grads_out(net)
@@ -287,7 +282,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             else:
                 mask_lr = args.lr_task*0.1
         else:
-            mask_lr = args.lr_task
+            mask_lr = args.lr_task*0.1
 
     # Train shared weights in a traditional way only in first task
     if task_id == 0:
@@ -322,44 +317,48 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
 
 
     # Training Share weights, via meta training or in a traditional way
-    # net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
-    # params = []
-    # for p in net.shared.parameters():
-    #     params.append(p)
-    # if not args.use_meta:
-    #     args.meta_epochs = 1
-    #     for p in net.head[task_id].parameters():
-    #         params.append(p)
-    # opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
-    # for e in range(args.meta_epochs):
-    #     if args.use_meta:
-    #         meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
-    #     else:
-    #         meta_acc, meta_loss = traditional_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
-    #     print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
+    net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
+    params = []
+    for p in net.shared.parameters():
+        params.append(p)
+    if not args.use_meta:
+        args.meta_epochs = 1
+        for p in net.head[task_id].parameters():
+            params.append(p)
+    for e in range(args.meta_epochs):
+        if args.use_meta:
+            opti_shared = optim.SGD(params, args.lr_meta*0.1,  weight_decay=0.9) # 
+            meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
+        else:
+            opti_shared = optim.SGD(params, args.lr_meta) # 
+            meta_acc, meta_loss = traditional_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f}".format(e+1,args.meta_epochs,meta_acc, meta_loss))
 
-    # # Consolidating Knowledge
-    # if args.only_shared:
-    #     params = []
-    #     for p in net.head[task_id].parameters():
-    #         params.append(p)
-    #     opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
-    #     acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
-    #     acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-    #     print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
-    # else:
-    #     params = []
-    #     if args.task_embedding:
-    #         for p in net.private.feat_extraction.parameters():
-    #             params.append(p)
-    #     for p in net.private.linear[task_id].parameters():
-    #         params.append(p)
-    #     for p in net.head[task_id].parameters():
-    #         params.append(p)
-    #     opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
-    #     acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
-    #     acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-    #     print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+    for k,v in memory.keys():
+        
+
+    # Consolidating Knowledge
+    if args.only_shared:
+        params = []
+        for p in net.head[task_id].parameters():
+            params.append(p)
+        opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
+        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
+        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+    else:
+        params = []
+        if args.task_embedding:
+            for p in net.private.feat_extraction.parameters():
+                params.append(p)
+        for p in net.private.linear[task_id].parameters():
+            params.append(p)
+        for p in net.head[task_id].parameters():
+            params.append(p)
+        opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
+        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
+        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
 
 def train_extra(args, net, task_id, dataloader, criterion, device):
     opti_shared_mask = optim.SGD(net.parameters(), args.lr_task, weight_decay=0.01, momentum=0.9)

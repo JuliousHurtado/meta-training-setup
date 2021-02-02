@@ -64,8 +64,8 @@ def run(args, run_id):
     memory_masks = {}
     change = { 0: {} }
 
-    # for n,p in net.shared.named_parameters():
-    #     change[0][n] = p.to('cpu')
+    for n,p in net.shared.named_parameters():
+        change[0][n] = p.to('cpu')
 
 
     masks = {'train': {}, 'test': {}}
@@ -84,13 +84,13 @@ def run(args, run_id):
         print('-'*150)
         print()
 
-        # change[t+1] = {}
-        # for n,p in net.shared.named_parameters():
-        #     change[t+1][n] = p.to('cpu') - change[0][n]
+        change[t+1] = {}
+        for n,p in net.shared.named_parameters():
+            change[t+1][n] = p.to('cpu') - change[0][n]
 
-        if args.get_masks:
-            masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
-            feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
+        # if args.get_masks:
+        #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
+        #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
             
         if args.test_task_free:
             memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
@@ -109,12 +109,12 @@ def run(args, run_id):
             acc[t, u] = test_res[0]
             lss[t, u] = test_res[1]
 
-    for t1,ncla in args.taskcla:
-        masks['test'][t1] = {}
-        feats['test'][t1] = {}
-        for t2,ncla in args.taskcla:
-            masks['test'][t1][t2] = getMasks(net, t2, dataset[t1]['test'], device)
-            feats['test'][t1][t2] = get_feature(net, t2, dataset[t1]['test'], device)
+    # for t1,ncla in args.taskcla:
+    #     masks['test'][t1] = {}
+    #     feats['test'][t1] = {}
+    #     for t2,ncla in args.taskcla:
+    #         masks['test'][t1][t2] = getMasks(net, t2, dataset[t1]['test'], device)
+    #         feats['test'][t1][t2] = get_feature(net, t2, dataset[t1]['test'], device)
 
     if args.get_masks:
         torch.save({ 'change_param': change, 'mean_mask': masks, 'feats': feats, 'args': args }, 
