@@ -83,68 +83,12 @@ def test(net, task_id, dataloader, criterion, device, task_pri = None):
     net.train()
     return correct/total, loss/len(dataloader)
 
-def test_task_free(args, net, task_id, mem_masks, dataloader, criterion, device):
-    net.eval()
-    correct, loss = 0.0, 0.0
-    total = 0.0
-    total_correct = 0.0
-    pdist = torch.nn.PairwiseDistance(p=args.mask_dist_p)
-    for i, batch in enumerate(dataloader):
-        inputs = batch[0].to(device)
-        labels = batch[1].to(device)
-        inputs_feats = batch[2].to(device)
-
-        diff_task = []
-        for k in mem_masks.keys(): 
-            mask_batch = {}
-            masks = net.get_masks(inputs.clone(), k, inputs_feats.clone())
-
-            for j,layer in enumerate(masks):
-                if j not in mask_batch:
-                    mask_batch[j] = []
-                mask_batch[j].extend(layer[0].squeeze())
-
-            dist = None
-            for i, masks in mask_batch.items():
-                t_masks = torch.stack(masks)
-
-                d = torch.cdist(t_masks,mem_masks[k][i])
-                if dist is None:
-                    dist = d.clone()
-                else:
-                    dist += d
-
-            diff_task.append(torch.min(dist, dim=1)[0])
-        print(torch.argmin(torch.stack(diff_task), dim=0))
-
-        m_correct = ( torch.argmin(torch.stack(diff_task), dim=0) == task_id )
-        print(m_correct.sum())
-
-        total_correct += m_correct.sum()
-        outs, _ = net(inputs, task_id, inputs_feats)
-        _, preds = outs.max(1)
-
-        correct += preds[m_correct].eq(labels[m_correct].view_as(preds[m_correct])).sum().item()
-
-        l = criterion(outs, labels) 
-        loss += l.item()
-
-        total += inputs.size(0)
-    print(correct/total_correct)
-    net.train()
-    return correct/total, loss/len(dataloader)
-
 def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device, use_memory):
     running_loss = 0.0
     net.train()
     inputs = batch[0].to(device)
     labels = batch[1].to(device)
     inputs_feats = batch[2].to(device)
-
-    # print("Train")
-    # print(task_id)
-    # print(use_memory)
-    # print(inputs_feats.sum())
 
     if opti is not None:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(opti,factor=0.5, patience=5, threshold=0.001)
@@ -331,10 +275,10 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             params.append(p)
     for e in range(args.meta_epochs):
         if args.use_meta:
-            opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.8) # *0.1, weight_decay=0.9 
+            opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.1) # *0.1, weight_decay=0.9 
             meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
-            opti_shared = optim.SGD(params, args.lr_meta) # 
+            opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
             meta_acc, meta_loss = traditional_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
         acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f} Test Acc: {:.4f}\t".format(e+1,args.meta_epochs,meta_acc, meta_loss, acc_valid))
