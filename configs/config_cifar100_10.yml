@@ -9,7 +9,7 @@ data_dir: "../data"
 checkpoint: "./checkpoints/"
 
 # Experiment
-num_runs: 1
+num_runs: 3
 ntasks: 20
 n_channels: 3
 workers: 4
@@ -19,7 +19,6 @@ seed: 48
 epochs: 70
 feats_epochs: 20
 meta_epochs: 10
-epochs_inner_task: 1
 batch_size: 128
 pc_valid: 0.15
 lr_meta: 0.01
@@ -37,23 +36,6 @@ use_meta: True
 mini_tasks: 10
 inner_loop: 40
 
-#Optimizer
-shad_meta: True
-priv_meta: False
-priv_l_meta: False
-head_meta: False
-
-shad_task: False
-priv_task: True
-priv_l_task: True
-head_task: True
-
-# Regularization
-mask_reg: False
-mask_theta: 0.001
-diff_reg: False
-diff_theta: 0.01
-
 # #Modelo Completo:
 use_share: True
 con_pri_shd: False
@@ -66,21 +48,10 @@ use_memory: False
 prob_use_mem: 0.5
 mem_size: 5
 
-#task-free
-test_task_free: False
-mask_select: 'random' # random, mean
-num_masks: 50 # random >= 1; mean == 1
-mask_per_class: True
-dist_masks: 'cosine' #cosine, pdist
-mask_dist_p: 2
-mask_binary: True
-min_value_mask: 0.01
-
 # Use last private model to get masks
 use_last_pri: False
 
 #Extra
 get_masks: False
-
 use_one_representation: False
 save_model: False

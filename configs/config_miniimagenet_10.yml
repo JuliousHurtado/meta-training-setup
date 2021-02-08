@@ -22,14 +22,13 @@ meta_epochs: 10
 epochs_inner_task: 1
 batch_size: 128
 pc_valid: 0.02
-lr_meta: 0.01 #0.001 
+lr_meta: 0.001 #0.001 
 lr_task: 0.01
 
 #Model
 head_units: 128
 latent_dim: 256
 resnet18: False
-resnet_pre_trained: True
 task_embedding: False
 
 #Meta
@@ -37,26 +36,8 @@ use_meta: False #
 mini_tasks: 30 #80
 inner_loop: 30 #75
 
-#Optimizer
-shad_meta: True
-priv_meta: False
-priv_l_meta: False
-head_meta: False
-
-shad_task: False
-priv_task: True
-priv_l_task: True
-head_task: True
-
-# Regularization
-mask_reg: False
-mask_theta: 0.001
-diff_reg: False
-diff_theta: 0.01
-
 # #Modelo Completo:
 use_share: True
-con_pri_shd: False
 use_private: True
 use_mask: True
 only_shared: False
@@ -66,23 +47,10 @@ use_memory: False
 prob_use_mem: 0.5
 mem_size: 5
 
-#task-free
-test_task_free: False
-mask_select: 'random' # random, mean
-num_masks: 100 # random >= 1; mean == 1
-mask_per_class: True
-dist_masks: 'cosine' #cosine, pdist, diff
-mask_dist_p: 2
-mask_binary: False
-min_value_mask: 0.05
-
-
 # Use last private model to get masks
 use_last_pri: False
 
 #Extra
 get_masks: False
-
 use_one_representation: False
-
 save_model: False
