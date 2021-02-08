@@ -1,7 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# Base on the code: https://github.com/facebookresearch/Adversarial-Continual-Learning
 
 import torch
 import numpy as np
@@ -199,10 +196,6 @@ class Net(nn.Module):
         self.image_size = self.ncha*size*size
         self.args=args
 
-        self.hidden1 = args.head_units
-        self.hidden2 = args.head_units//2
-
-
         if args.experiment == 'cifar100':
             hiddens = [64, 128, 256, 512, 512]
 
@@ -220,9 +213,6 @@ class Net(nn.Module):
         else:
             raise NotImplementedError
 
-        self.mask_reg = args.mask_reg
-        self.mask_ref_coef = args.mask_theta
-
         self.shared = None
         self.private = None
         if args.use_share:
@@ -230,32 +220,19 @@ class Net(nn.Module):
         if args.use_private:
             self.private = Private(args, hiddens, 3)
 
-        self.con_pri_shd = args.con_pri_shd
         self.use_share = args.use_share
         self.use_private = args.use_private
         self.use_mask = args.use_mask
         self.only_shared = args.only_shared
 
         self.latent_dim = args.latent_dim
-        if self.con_pri_shd:
-            self.latent_dim *= 2
 
         self.head = nn.ModuleList()
-        if self.con_pri_shd:
-            for i in range(self.num_tasks):
-                self.head.append(
-                    nn.Sequential(
-                        nn.Linear(self.latent_dim*2, self.hidden1),
-                        nn.ReLU(inplace=True),
-                        nn.Dropout(0.2),
-                        nn.Linear(self.hidden1, self.taskcla[i][1])
-                    ))
-        else:
-            for i in range(self.num_tasks):
-                self.head.append(
-                    nn.Sequential(
-                        nn.Linear(self.latent_dim, self.taskcla[i][1])
-                    ))
+        for i in range(self.num_tasks):
+            self.head.append(
+                nn.Sequential(
+                    nn.Linear(self.latent_dim, self.taskcla[i][1])
+                ))
 
 
     def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None, use_memory = False):
