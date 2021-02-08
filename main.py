@@ -12,8 +12,8 @@ import utils
 
 from models.conv import Net
 from models.hat import HatNet
-from approach import test, training_procedure, train_extra, test_task_free
-from utils import get_mem_masks, getMasks, get_feature, set_memory
+from approach import test, training_procedure, train_extra
+from utils import getMasks, get_feature, set_memory
 
 def run(args, run_id):
     # Args -- Experiment
@@ -61,7 +61,6 @@ def run(args, run_id):
 
     total_res = {}
     memory = {}
-    memory_masks = {}
     change = { 0: {} }
 
     for n,p in net.shared.named_parameters():
@@ -84,7 +83,8 @@ def run(args, run_id):
         print('-'*150)
         print()
 
-        memory[t] = set_memory(args, dataset[t]['train'], ncla)
+        if args.use_memory:
+            memory[t] = set_memory(args, dataset[t]['train'], ncla)
 
         # change[t+1] = {}
         # for n,p in net.shared.named_parameters():
@@ -93,15 +93,10 @@ def run(args, run_id):
         # if args.get_masks:
         #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
         #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
-            
-        if args.test_task_free:
-            memory_masks[t] = get_mem_masks(args, net, t, dataset[t]['train'], device)
 
         for u in range(t+1):
             if args.use_last_pri:
                 test_res = test(net, u, dataset[u]['test'], criterion, device, t)
-            elif args.test_task_free:
-                test_res = test_task_free(args, net, u, memory_masks, dataset[u]['test'], criterion, device)
             else:
                 test_res = test(net, u, dataset[u]['test'], criterion, device)
             print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u+1, dataset[u]['name'],

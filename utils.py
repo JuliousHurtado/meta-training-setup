@@ -119,29 +119,6 @@ def getMasks(net, task_id, dataloader, device):
 
     return m_all
 
-def get_mem_masks(args, net, task_id, dataloader, device):
-    m_all = {'masks': {}, 'labels': []}
-    net.eval()
-    for i, batch in enumerate(dataloader):
-        inputs = batch[0].to(device)
-        labels = batch[1]
-        inputs_feats = batch[2].to(device)
-
-        m_all['labels'].extend(labels.tolist())
-        masks = net.get_masks(inputs, task_id, inputs_feats)
-
-        for j,layer in enumerate(masks):
-            if j not in m_all['masks']:
-                m_all['masks'][j] = []
-            m_all['masks'][j].extend(layer[0].squeeze().tolist())
-
-    t_masks = {}
-    for i, masks in m_all['masks'].items():
-        t_masks[i] = torch.stack([ torch.tensor(m).to(device) for m in masks ]).to(device)
-
-    net.train()
-    return t_masks
-
 def get_feature(net, task_id, dataloader, device):
     f_all = {'feats': [], 'labels': []}
     net.eval()
