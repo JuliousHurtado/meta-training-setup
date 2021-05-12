@@ -194,17 +194,16 @@ class Net(nn.Module):
         else:
             raise NotImplementedError
 
+        self.use_share = args.use_share
+        self.use_mask = args.use_mask
+        self.only_shared = args.only_shared
+
         self.shared = None
         self.private = None
         if args.use_share:
             self.shared = Shared(args, hiddens)
-        if args.use_private:
+        if not self.only_shared:
             self.private = Private(args, hiddens, 3)
-
-        self.use_share = args.use_share
-        self.use_private = args.use_private
-        self.use_mask = args.use_mask
-        self.only_shared = args.only_shared
 
         self.latent_dim = args.latent_dim
 
@@ -234,7 +233,7 @@ class Net(nn.Module):
                 m_p = [ [torch.ones_like(m[0])] for m in m_p ]
 
         x_s = self.shared(x.clone(), m_p)
-
+        
         if shared_clf:
             pred = self.shared_clf(x_s)
         else:
@@ -243,7 +242,7 @@ class Net(nn.Module):
         return pred, 0
 
     def print_model_size(self):
-        if self.use_private:
+        if self.private:
             count_P = sum(p.numel() for p in self.private.parameters() if p.requires_grad)
             if self.private.use_resnet:
                 count_pre_train = sum(p.numel() for p in self.private.feat_extraction.parameters())

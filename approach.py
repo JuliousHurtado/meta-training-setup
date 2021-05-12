@@ -123,7 +123,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
     net#.to('cpu')
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net).to(device)
-        t_net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
+        t_net.shared_clf = torch.nn.Linear(net.latent_dim, net.taskcla[task_id][1]).to(device)
 
         params = []
         for p in t_net.shared.parameters():
@@ -264,7 +264,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
 
 
     # Training Share weights, via meta training or in a traditional way
-    net.shared_clf = torch.nn.Linear(net.private.dim_embedding, net.taskcla[task_id][1]).to(device)
+    net.shared_clf = torch.nn.Linear(net.latent_dim, net.taskcla[task_id][1]).to(device)
     params = []
     for p in net.shared.parameters():
         params.append(p)

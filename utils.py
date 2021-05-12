@@ -85,10 +85,12 @@ def set_grads(net, save_grads, task_id):
                 p.grad = save_grads[n]
     except:
         pass
-
-    for n,p in net.private.linear[task_id].named_parameters():
-        if n in save_grads:
-            p.grad = save_grads[n]
+    
+    if net.private:
+        for n,p in net.private.linear[task_id].named_parameters():
+            if n in save_grads:
+                p.grad = save_grads[n]
+    
 
     try:
         for n,p in net.private.last_em[task_id].named_parameters():

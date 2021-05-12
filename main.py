@@ -180,6 +180,9 @@ if __name__ == '__main__':
     parser.add_argument('--random-f', type=int, default=0)
     parser.add_argument('--num-iter', type=int, default=1)
 
+    parser.add_argument('--only-shared', type=int, default=0)
+    parser.add_argument('--use-meta', type=int, default=1)
+
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
 
@@ -196,6 +199,11 @@ if __name__ == '__main__':
     if flags.random_f == 1:
         args.random_f = True
         args.use_one_representation = True
+
+    if flags.only_shared == 1:
+        args.only_shared = True
+    if flags.use_meta == 0:
+        args.use_meta = False
 
 
 
