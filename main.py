@@ -106,6 +106,12 @@ def run(args, run_id):
 
                 acc[t, u] = test_res[0]
                 lss[t, u] = test_res[1]
+            
+            if args.save_model:
+                torch.save({
+                        'args': args,
+                        'checkpoint': net.state_dict()
+                        }, 'models/{}_use_meta_{}_only_share_{}.pth'.format(args.experiment, args.use_meta, args.only_shared))
 
     # for t1,ncla in args.taskcla:
     #     masks['test'][t1] = {}
@@ -117,12 +123,6 @@ def run(args, run_id):
     if args.get_masks:
         torch.save({ 'change_param': change, 'mean_mask': masks, 'feats': feats, 'args': args }, 
                 'masks/{}_{}_{}_{}_for_task_free_feats.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
-
-    if args.save_model:
-        torch.save({
-                'args': args,
-                'checkpoint': net.state_dict()
-                }, 'models/{}_resnet_{}.pth'.format(args.experiment, args.resnet18))
 
     avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res
@@ -181,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-iter', type=int, default=1)
 
     parser.add_argument('--only-shared', type=int, default=0)
+    parser.add_argument('--save-model', type=int, default=0)
     parser.add_argument('--use-meta', type=int, default=1)
 
     flags =  parser.parse_args()
@@ -204,6 +205,9 @@ if __name__ == '__main__':
         args.only_shared = True
     if flags.use_meta == 0:
         args.use_meta = False
+
+    if flags.save_model == 1:
+        args.save_model = True
 
 
 
