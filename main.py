@@ -176,6 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('--ntasks', type=int, default=-1)
 
     parser.add_argument('--pre-train-shared', type=int, default=1)
+    parser.add_argument('--random-f', type=int, default=0)
 
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
@@ -187,6 +188,8 @@ if __name__ == '__main__':
     
     if flags.pre_train_shared == 0:
         args.pre_train_shared = False
+    if flags.random_f == 1:
+        args.random_f = True
 
 
 
