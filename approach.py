@@ -216,23 +216,26 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
     }
 
     # Train input representation
-    if args.use_one_representation:
-        if args.random_f:
-            mask_lr = args.lr_task
-        elif task_id == 0 and not args.resnet18:
-            train_representation(args, net, dataloader, task_id, criterion, device)
-            mask_lr = args.lr_task
-        else:
-            mask_lr = args.lr_task*0.1
-    else:
-        if not args.only_shared:
-            if not args.resnet18:
+    if args.train_f_representation:
+        if args.use_one_representation:
+            if args.random_f:
+                mask_lr = args.lr_task
+            elif task_id == 0 and not args.resnet18:
                 train_representation(args, net, dataloader, task_id, criterion, device)
                 mask_lr = args.lr_task
             else:
                 mask_lr = args.lr_task*0.1
         else:
-            mask_lr = args.lr_task*0.1
+            if not args.only_shared:
+                if not args.resnet18:
+                    train_representation(args, net, dataloader, task_id, criterion, device)
+                    mask_lr = args.lr_task
+                else:
+                    mask_lr = args.lr_task*0.1
+            else:
+                mask_lr = args.lr_task*0.1
+    else:
+        mask_lr = args.lr_task*0.01
 
     # Train shared weights in a traditional way only in first task
     if task_id == 0 and args.pre_train_shared:

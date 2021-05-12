@@ -69,6 +69,7 @@ def run(args, run_id):
 
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
+    args.train_f_representation = True
     for _ in range(args.num_iter):
         for t,ncla in args.taskcla:
             print('*'*150)
@@ -107,11 +108,13 @@ def run(args, run_id):
                 acc[t, u] = test_res[0]
                 lss[t, u] = test_res[1]
             
+            args.pre_train_shared = False
             if args.save_model:
                 torch.save({
                         'args': args,
                         'checkpoint': net.state_dict()
                         }, 'models/{}_use_meta_{}_only_share_{}.pth'.format(args.experiment, args.use_meta, args.only_shared))
+        args.train_f_representation = False
 
     # for t1,ncla in args.taskcla:
     #     masks['test'][t1] = {}
