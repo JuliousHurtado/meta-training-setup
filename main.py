@@ -169,6 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='./configs/config_mnist5.yml')
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
+    parser.add_argument('--feats-epochs', type=int, default=20)
 
     parser.add_argument('--num-masks', type=int, default=-1)
     parser.add_argument('--dist-masks', type=str, default='')
@@ -180,6 +181,8 @@ if __name__ == '__main__':
 
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
+
+    args.feats_epochs = flags.feats_epochs
 
     if flags.mini_tasks >= 0:
         args.mini_tasks = flags.mini_tasks
