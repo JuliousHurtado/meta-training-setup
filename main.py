@@ -113,7 +113,7 @@ def run(args, run_id):
                 torch.save({
                         'args': args,
                         'checkpoint': net.state_dict()
-                        }, 'models/{}_use_meta_{}_only_share_{}.pth'.format(args.experiment, args.use_meta, args.only_shared))
+                        }, 'models/{}_use_meta_{}_only_share_{}_task_{}.pth'.format(args.experiment, args.use_meta, args.only_shared, t))
         args.train_f_representation = False
 
     # for t1,ncla in args.taskcla:
