@@ -193,6 +193,7 @@ if __name__ == '__main__':
         args.pre_train_shared = False
     if flags.random_f == 1:
         args.random_f = True
+        args.use_one_representation = True
 
 
 
