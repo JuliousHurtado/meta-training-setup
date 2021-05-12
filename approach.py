@@ -215,25 +215,26 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
         'train_acc': []
     }
 
-     # Train input representation
-    if args.use_one_representation:
-        if task_id == 0 and not args.resnet18 and not args.task_embedding:
-            train_representation(args, net, dataloader, task_id, criterion, device)
-            mask_lr = args.lr_task
-        else:
-            mask_lr = args.lr_task*0.1
-    else:
-        if not args.only_shared:
-            if not args.resnet18 and not args.task_embedding:
-                train_representation(args, net, dataloader, task_id, criterion, device)
-                mask_lr = args.lr_task
-            else:
-                mask_lr = args.lr_task*0.1
-        else:
-            mask_lr = args.lr_task*0.1
+    # Train input representation
+    # if args.use_one_representation:
+    #     if task_id == 0 and not args.resnet18:
+    #         train_representation(args, net, dataloader, task_id, criterion, device)
+    #         mask_lr = args.lr_task
+    #     else:
+    #         mask_lr = args.lr_task*0.1
+    # else:
+    #     if not args.only_shared:
+    #         if not args.resnet18:
+    #             train_representation(args, net, dataloader, task_id, criterion, device)
+    #             mask_lr = args.lr_task
+    #         else:
+    #             mask_lr = args.lr_task*0.1
+    #     else:
+    #         mask_lr = args.lr_task*0.1
+    mask_lr = args.lr_task
 
     # Train shared weights in a traditional way only in first task
-    if task_id == 0:
+    if task_id == 0 and args.pre_train_shared:
         params = []
         for p in net.shared.parameters():
             params.append(p)
@@ -250,9 +251,6 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
     # Learning to Reuse previous knowledge, training mask and classifier
     if not args.only_shared:
         params = []
-        if args.task_embedding:
-            for p in net.private.feat_extraction.parameters():
-                params.append(p)
         for p in net.private.linear[task_id].parameters():
             params.append(p)
         for p in net.head[task_id].parameters():
@@ -296,9 +294,6 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
         print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
     else:
         params = []
-        if args.task_embedding:
-            for p in net.private.feat_extraction.parameters():
-                params.append(p)
         for p in net.private.linear[task_id].parameters():
             params.append(p)
         for p in net.head[task_id].parameters():

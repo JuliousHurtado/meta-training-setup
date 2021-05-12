@@ -169,43 +169,26 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='./configs/config_mnist5.yml')
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
-    parser.add_argument('--prob-use-mem', type=float, default=-1.0)
-    parser.add_argument('--mem-size', type=int, default=-1)
-    parser.add_argument('--use-memory', type=int, default=0)
 
     parser.add_argument('--num-masks', type=int, default=-1)
     parser.add_argument('--dist-masks', type=str, default='')
     parser.add_argument('--mask-dist-p', type=int, default=-1)
     parser.add_argument('--ntasks', type=int, default=-1)
 
+    parser.add_argument('--pre-train-shared', type=int, default=1)
+
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
-
-    args.use_memory = flags.use_memory
-
-    if args.use_memory:
-        print("True")
-    else:
-        print("False")
 
     if flags.mini_tasks >= 0:
         args.mini_tasks = flags.mini_tasks
     if flags.inner_loop >= 0:
         args.inner_loop = flags.inner_loop
-    if flags.prob_use_mem >= 0:
-        args.prob_use_mem = flags.prob_use_mem
-    if flags.mem_size >= 0:
-        args.mem_size = flags.mem_size
-    if flags.ntasks >= 0:
-        args.ntasks = flags.ntasks
+    
+    if flags.pre_train_shared == 0:
+        args.pre_train_shared = False
 
-    # Task-Free conditions
-    if flags.num_masks >= 0:
-        args.num_masks = flags.num_masks
-    if flags.mask_dist_p >= 0:
-        args.mask_dist_p = flags.mask_dist_p
-    if flags.dist_masks != '':
-        args.dist_masks = flags.dist_masks
+
 
     main(args)
 

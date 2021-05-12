@@ -63,12 +63,10 @@ class Private(nn.Module):
         super(Private, self).__init__()
 
         self.use_resnet = args.resnet18
-        self.task_embedding = args.task_embedding
         self.layers = layers
         self.hiddens = hiddens
         self.dim_embedding = args.latent_dim
         self.num_tasks = args.ntasks
-        self.use_em = args.con_pri_shd
         self.one_representation = args.use_one_representation
 
         if args.use_one_representation:
@@ -83,9 +81,6 @@ class Private(nn.Module):
                 p.requires_grad = False
 
             self.num_ftrs = resnet18.fc.in_features
-        elif self.task_embedding:
-            self.feat_extraction = nn.Embedding(args.ntasks, self.dim_embedding)
-            self.num_ftrs = self.dim_embedding
         else:
             if args.experiment == 'cifar100':
                 hiddens=[32,32]
@@ -149,14 +144,6 @@ class Private(nn.Module):
                             )
                 linear.append(mask_lin)
             self.linear.append(linear)
-
-
-            if args.con_pri_shd:
-                self.last_em.append(nn.Sequential(
-                            nn.Linear(self.num_ftrs, self.dim_embedding),
-                            nn.ReLU(),
-                            nn.Dropout(0.5),
-                            ))
                 
     def forward(self, x, task_id):
         m = []
@@ -166,9 +153,6 @@ class Private(nn.Module):
 
         if self.use_resnet:
             x = self.feat_extraction(x).squeeze()
-        elif self.task_embedding:
-            emb = (torch.ones(x.size(0))*task_id).to(x.device).long()
-            x = self.feat_extraction(emb)
         else:
             if self.one_representation:
                 x = self.conv[0](x)
@@ -180,9 +164,6 @@ class Private(nn.Module):
             m.append([
                 film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
                 ])
-
-        if self.use_em:
-            x = self.last_em[task_id](x)
 
         return m, x
 
