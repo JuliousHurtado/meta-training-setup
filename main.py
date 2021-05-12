@@ -69,42 +69,43 @@ def run(args, run_id):
 
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
-    for t,ncla in args.taskcla:
-        print('*'*150)
-        dataset = dataloader.get(t)
-        print(' '*75, 'Dataset {:2d} ({:s})'.format(t+1,dataset[t]['name']))
-        print('*'*150)
+    for _ in range(args.num_iter):
+        for t,ncla in args.taskcla:
+            print('*'*150)
+            dataset = dataloader.get(t)
+            print(' '*75, 'Dataset {:2d} ({:s})'.format(t+1,dataset[t]['name']))
+            print('*'*150)
 
-        if args.experiment == 'multidatasets':
-            args.lr_task = dataloader.lrs[t][1]
+            if args.experiment == 'multidatasets':
+                args.lr_task = dataloader.lrs[t][1]
 
-        res_task = training_procedure(args, net, t, dataset[t], criterion, device, memory)
-        total_res[t] = res_task
-        print('-'*150)
-        print()
+            res_task = training_procedure(args, net, t, dataset[t], criterion, device, memory)
+            total_res[t] = res_task
+            print('-'*150)
+            print()
 
-        if args.use_memory:
-            memory[t] = set_memory(args, dataset[t]['train'], ncla)
+            if args.use_memory:
+                memory[t] = set_memory(args, dataset[t]['train'], ncla)
 
-        # change[t+1] = {}
-        # for n,p in net.shared.named_parameters():
-        #     change[t+1][n] = p.to('cpu') - change[0][n]
+            # change[t+1] = {}
+            # for n,p in net.shared.named_parameters():
+            #     change[t+1][n] = p.to('cpu') - change[0][n]
 
-        # if args.get_masks:
-        #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
-        #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
+            # if args.get_masks:
+            #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
+            #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
 
-        for u in range(t+1):
-            if args.use_last_pri:
-                test_res = test(net, u, dataset[u]['test'], criterion, device, t)
-            else:
-                test_res = test(net, u, dataset[u]['test'], criterion, device)
-            print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u+1, dataset[u]['name'],
-                                                                                          test_res[1],
-                                                                                          test_res[0]))
+            for u in range(t+1):
+                if args.use_last_pri:
+                    test_res = test(net, u, dataset[u]['test'], criterion, device, t)
+                else:
+                    test_res = test(net, u, dataset[u]['test'], criterion, device)
+                print('>>> Test on task {:2d} - {:15s}: loss={:.3f}, acc={:5.1f}% <<<'.format(u+1, dataset[u]['name'],
+                                                                                            test_res[1],
+                                                                                            test_res[0]))
 
-            acc[t, u] = test_res[0]
-            lss[t, u] = test_res[1]
+                acc[t, u] = test_res[0]
+                lss[t, u] = test_res[1]
 
     # for t1,ncla in args.taskcla:
     #     masks['test'][t1] = {}
@@ -162,7 +163,6 @@ def main(args):
             'args': args,
             }, args.output)
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Adversarial Continual Learning...')
     # Load the config file
@@ -178,11 +178,13 @@ if __name__ == '__main__':
 
     parser.add_argument('--pre-train-shared', type=int, default=1)
     parser.add_argument('--random-f', type=int, default=0)
+    parser.add_argument('--num-iter', type=int, default=1)
 
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
 
     args.feats_epochs = flags.feats_epochs
+    args.num_iter = flags.num_iter
 
     if flags.mini_tasks >= 0:
         args.mini_tasks = flags.mini_tasks
