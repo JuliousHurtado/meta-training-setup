@@ -188,6 +188,7 @@ if __name__ == '__main__':
     parser.add_argument('--only-shared', type=int, default=0)
     parser.add_argument('--save-model', type=int, default=0)
     parser.add_argument('--use-meta', type=int, default=1)
+    parser.add_argument('--use-relu', type=int, default=1)
 
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
@@ -213,6 +214,9 @@ if __name__ == '__main__':
 
     if flags.save_model == 1:
         args.save_model = True
+
+    if flags.use_relu == 0:
+        args.use_relu = False
 
 
 

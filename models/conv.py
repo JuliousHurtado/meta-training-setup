@@ -133,13 +133,19 @@ class Private(nn.Module):
                 self.conv.append(layer)
             self.num_ftrs = self.dim_embedding
 
+
+        if args.use_relu:
+            ac_funt = nn.ReLU()
+        else:
+            ac_funt = nn.Sigmoid()
+
         self.linear = nn.ModuleList()
         for i in range(args.ntasks):
             linear = nn.ModuleList()
             for j in range(self.layers):
                 mask_lin = nn.Sequential(
                                 nn.Linear(self.num_ftrs, int(self.hiddens[j])),
-                                nn.Sigmoid(), # nn.ReLU(),   # 
+                                ac_funt, # nn.ReLU(),   # 
                             )
                 linear.append(mask_lin)
             self.linear.append(linear)
