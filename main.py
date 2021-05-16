@@ -108,7 +108,7 @@ def run(args, run_id):
                 acc[t, u] = test_res[0]
                 lss[t, u] = test_res[1]
             
-            args.pre_train_shared = False
+            # args.pre_train_shared = False
             if args.save_model:
                 torch.save({
                         'args': args,
@@ -116,7 +116,7 @@ def run(args, run_id):
                         }, 'models/{}_use_meta_{}_only_share_{}_task_{}.pth'.format(args.experiment, args.use_meta, args.only_shared, t))
 
         avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
-        args.train_f_representation = False
+        # args.train_f_representation = False
 
     # for t1,ncla in args.taskcla:
     #     masks['test'][t1] = {}

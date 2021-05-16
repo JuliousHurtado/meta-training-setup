@@ -191,9 +191,9 @@ def traditional_training(args, net, loader, task_id, opti_shared, criterion, dev
             labels = batch[1].to(device)
             inputs_feats = batch[2].to(device)
 
-            outs, reg_loss  = net(inputs, task_id, inputs_feats)
+            outs, _  = net(inputs, task_id, inputs_feats)
             _, preds = outs.max(1)
-            l = criterion(outs, labels) + reg_loss
+            l = criterion(outs, labels)
             l.backward()
 
             opti_shared.step()
