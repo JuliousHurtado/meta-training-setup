@@ -180,12 +180,13 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
 
     return np.mean(grads_acc['acc']), loss_mini_task/args.mini_tasks
 
-def traditional_training(args, net, loader, task_id, opti_shared, criterion, device):
+def traditional_training(args, net, loader_train, val_loader, task_id, opti_shared, criterion, device):
+    val_acc = []
     for e in range(args.feats_epochs):
         correct = 0.0
         total = 0.0
         loss = 0.0
-        for i, batch in enumerate(loader):
+        for i, batch in enumerate(loader_train):
             opti_shared.zero_grad()
             inputs = batch[0].to(device)
             labels = batch[1].to(device)
@@ -202,18 +203,15 @@ def traditional_training(args, net, loader, task_id, opti_shared, criterion, dev
             total += inputs.size(0)
             loss += l.item()
 
+        if args.test_every_epoch:
+            acc_valid, _ = test(net, task_id, val_loader, criterion, device)
+            val_acc.append(acc_valid)
+
     #print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
-    return correct/total, loss/len(loader)
+    return correct/total, loss/len(loader_train), val_acc
 
 def training_procedure(args, net, task_id, dataloader, criterion, device, memory):
-    results = {
-        'meta_loss': [],
-        'meta_acc': [],
-        'val_loss': [],
-        'val_acc': [],
-        'train_loss': [],
-        'train_acc': []
-    }
+    results_val = []
 
     # Train input representation
     if args.train_f_representation:
@@ -246,7 +244,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             params.append(p)
         opti_shared_task = optim.SGD(params, args.lr_task, weight_decay=0.01, momentum=0.9)
         net.only_shared = True
-        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_task, criterion, device)
+        acc_train, loss_train, _ = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared_task, criterion, device)
         net.only_shared = args.only_shared
         acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
         print("Train Shared: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
@@ -260,8 +258,9 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
         for p in net.head[task_id].parameters():
             params.append(p)
         opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
-        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
+        acc_train, loss_train, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared_mask, criterion, device)
         acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        results_val.append(hist_val)
         print("Mask Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
 
 
@@ -281,31 +280,31 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
             meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
             opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
-            meta_acc, meta_loss = traditional_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+            meta_acc, meta_loss, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared, criterion, device)
+            results_val.append(hist_val)
         acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
         print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f} Test Acc: {:.4f}\t".format(e+1,args.meta_epochs,meta_acc, meta_loss, acc_valid))
 
 
 
     # Consolidating Knowledge
-    if args.only_shared:
-        params = []
-        for p in net.head[task_id].parameters():
-            params.append(p)
-        opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
-        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
-        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-        print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
-    else:
-        params = []
+    params = []
+    if not args.only_shared:
         for p in net.private.linear[task_id].parameters():
             params.append(p)
-        for p in net.head[task_id].parameters():
-            params.append(p)
-        opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
-        acc_train, loss_train = traditional_training(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, device)
-        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-        print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+    for p in net.head[task_id].parameters():
+        params.append(p)
+    opti_shared_mask = optim.SGD(params, mask_lr, weight_decay=0.01, momentum=0.9)
+    acc_train, loss_train, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared_mask, criterion, device)
+    acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+    results_val.append(hist_val)
+    print("Final Training: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
+
+
+    if args.test_every_epoch:
+        torch.save({ 'args': args, 'result': results_val }, 
+                'results/{}_{}_{}_speed_of_training.pth'.format(args.experiment, task_id, args.only_shared))
+
 
 def train_extra(args, net, task_id, dataloader, criterion, device):
     opti_shared_mask = optim.SGD(net.parameters(), args.lr_task, weight_decay=0.01, momentum=0.9)

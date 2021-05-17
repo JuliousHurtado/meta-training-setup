@@ -174,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='./configs/config_mnist5.yml')
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
-    parser.add_argument('--feats-epochs', type=int, default=20)
+    parser.add_argument('--feats-epochs', type=int, default=50)
 
     parser.add_argument('--num-masks', type=int, default=-1)
     parser.add_argument('--dist-masks', type=str, default='')
@@ -189,6 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-model', type=int, default=0)
     parser.add_argument('--use-meta', type=int, default=1)
     parser.add_argument('--use-relu', type=int, default=1)
+    parser.add_argument('--test-every-epoch', type=int, default=0)
 
     flags =  parser.parse_args()
     args = OmegaConf.load(flags.config)
@@ -217,6 +218,9 @@ if __name__ == '__main__':
 
     if flags.use_relu == 0:
         args.use_relu = False
+    
+    if flags.test_every_epoch == 1:
+        args.test_every_epoch = True
 
 
 
