@@ -110,3 +110,4 @@ Adversarial-Continual-Learning/*
 data/*
 results/*
 server/*
+*.pth
