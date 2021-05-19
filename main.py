@@ -90,12 +90,12 @@ def run(args, run_id):
             if args.use_memory:
                 memory[t] = set_memory(args, dataset[t]['train'], ncla)
 
-            # change[t+1] = {}
-            # for n,p in net.shared.named_parameters():
-            #     change[t+1][n] = p.to('cpu') - change[0][n]
+            if args.get_masks:
+                change[t+1] = {}
+                for n,p in net.shared.named_parameters():
+                    change[t+1][n] = p.to('cpu') - change[0][n]
 
-            # if args.get_masks:
-            #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
+                masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
             #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
 
             for u in range(t+1):
@@ -129,8 +129,8 @@ def run(args, run_id):
     #         feats['test'][t1][t2] = get_feature(net, t2, dataset[t1]['test'], device)
 
     if args.get_masks:
-        torch.save({ 'change_param': change, 'mean_mask': masks, 'feats': feats, 'args': args }, 
-                'masks/{}_{}_{}_{}_for_task_free_feats.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18))
+        torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
+                'masks/{}_{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18, args.only_shared))
 
     # avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res
