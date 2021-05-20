@@ -138,14 +138,14 @@ class Private(nn.Module):
             ac_funt = nn.ReLU()
         else:
             ac_funt = nn.Sigmoid()
-
+            
         self.linear = nn.ModuleList()
         for i in range(args.ntasks):
             linear = nn.ModuleList()
             for j in range(self.layers):
                 mask_lin = nn.Sequential(
                                 nn.Linear(self.num_ftrs, int(self.hiddens[j])),
-                                ac_funt, # nn.ReLU(),   # 
+                                nn.Sigmoid(), # nn.ReLU(),   # 
                             )
                 linear.append(mask_lin)
             self.linear.append(linear)
@@ -284,6 +284,8 @@ class Net(nn.Module):
         return '%.1f%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])
 
     def get_masks(self, x, task_id, inputs_feats):
+        if self.only_shared:
+            return None
         if self.private.use_resnet:
             x_p = inputs_feats
         else:

@@ -105,6 +105,9 @@ def set_grads(net, save_grads, task_id):
 
 def getMasks(net, task_id, dataloader, device):
     m_all = {'masks': {}, 'labels': []}
+
+    if net.only_shared:
+        return m_all
     for i, batch in enumerate(dataloader):
         inputs = batch[0].to(device)
         labels = batch[1].to(device)
