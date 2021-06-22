@@ -68,10 +68,10 @@ class Private(nn.Module):
         self.dim_embedding = args.latent_dim
         self.num_tasks = args.ntasks
         self.one_representation = args.use_one_representation
+        self.use_pca = False
 
         if args.use_one_representation:
             self.num_tasks = 1
-
 
         if self.use_resnet:
             resnet18 = models.resnet18(pretrained=args.resnet_pre_trained)
@@ -81,6 +81,12 @@ class Private(nn.Module):
                 p.requires_grad = False
 
             self.num_ftrs = resnet18.fc.in_features
+            # assert False, self.feat_extraction
+
+            if args.use_pca:
+                self.use_pca = True
+                self.rank_matrix = {}
+
         else:
             if args.experiment == 'cifar100':
                 hiddens=[32,32]
@@ -93,16 +99,9 @@ class Private(nn.Module):
             elif args.experiment == 'multidatasets':
                 hiddens=[32,32]
                 flatten=1152
-                
-            elif args.experiment == 'imagenet':
-                hiddens = [64,128,256,256]
-                flatten = 256
-
-            self.ncha,self.size,_=args.inputsize
-
-
-            self.conv = torch.nn.ModuleList()
             
+            self.ncha,self.size,_=args.inputsize
+            self.conv = torch.nn.ModuleList()
 
             for _ in range(self.num_tasks):
                 layer = torch.nn.Sequential()
@@ -116,23 +115,12 @@ class Private(nn.Module):
                 layer.add_module('relu2', nn.ReLU(inplace=True))
                 # layer.add_module('dropout2', nn.Dropout(0.5))
                 layer.add_module('maxpool2', nn.MaxPool2d(2))
-                if args.experiment == "imagenet":
-                    layer.add_module('conv3', nn.Conv2d(hiddens[1], hiddens[2], kernel_size=3))
-                    layer.add_module('bn3', nn.BatchNorm2d(hiddens[2]))
-                    layer.add_module('relu3', nn.ReLU(inplace=True))
-                    layer.add_module('maxpool3', nn.MaxPool2d(2))
-                    layer.add_module('conv4', nn.Conv2d(hiddens[2], hiddens[3], kernel_size=3))
-                    layer.add_module('bn4', nn.BatchNorm2d(hiddens[3]))
-                    layer.add_module('relu4', nn.ReLU(inplace=True))
-                    layer.add_module('maxpool4', nn.MaxPool2d(2))
-                    layer.add_module('globavgpool2d', nn.AdaptiveAvgPool2d((1,1)))
                 layer.add_module('flatten', nn.Flatten())
                 layer.add_module('linear1', nn.Linear(flatten,self.dim_embedding))
                 layer.add_module('relu3', nn.ReLU(inplace=True))
                 #layer.add_module('drop', nn.Dropout(0.5))
                 self.conv.append(layer)
             self.num_ftrs = self.dim_embedding
-
 
         if args.use_relu:
             ac_funt = nn.ReLU()
@@ -145,7 +133,7 @@ class Private(nn.Module):
             for j in range(self.layers):
                 mask_lin = nn.Sequential(
                                 nn.Linear(self.num_ftrs, int(self.hiddens[j])),
-                                nn.Sigmoid(), # nn.ReLU(),   # 
+                                ac_funt, 
                             )
                 linear.append(mask_lin)
             self.linear.append(linear)
@@ -163,14 +151,28 @@ class Private(nn.Module):
                 x = self.conv[0](x)
             else:
                 x = self.conv[task_id](x)
-        
-        for i in range(self.layers):
-            film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
-            m.append([
-                film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
-                ])
+
+        if self.use_pca:
+            for i in range(self.layers):
+                m.append([torch.matmul(x, self.rank_matrix[task_id][:, :self.hiddens[i]]).unsqueeze(2).unsqueeze(3)])
+        else:
+            for i in range(self.layers):
+                film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
+                m.append([
+                    film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
+                    ])
 
         return m, x
+
+    def train_pca(self, dataloader, task_id, device):
+        x = []
+        for batch in dataloader:
+            input = batch[0].to(device)
+            x.append(self.feat_extraction(input).squeeze().cpu())
+        
+        x = torch.cat(x)
+        (_, _, V) = torch.pca_lowrank(x.clone(), q=self.hiddens[2], niter=5)
+        self.rank_matrix[task_id] = V.to(device).clone()
 
 class Net(nn.Module):
 
@@ -220,19 +222,12 @@ class Net(nn.Module):
                 ))
 
 
-    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None, use_memory = False):
+    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None):
         if self.only_shared:
             m_p = None
         else:
-            if task_pri is None:
-                task_pri = task_id
-
-            if use_memory or self.args.resnet18:
-                x_p = inputs_feats
-            else:
-                x_p = x.clone()
-
-            m_p, x_p = self.private(x_p, task_pri)
+            x_p = x.clone()
+            m_p, x_p = self.private(x_p, task_id)
 
             if not self.use_mask:
                 m_p = [ [torch.ones_like(m[0])] for m in m_p ]

@@ -12,8 +12,8 @@ import utils
 
 from models.conv import Net
 from models.hat import HatNet
-from approach import test, training_procedure, train_extra
-from utils import getMasks, get_feature, set_memory
+from approach import test, training_procedure
+from utils import getMasks
 
 def run(args, run_id):
     # Args -- Experiment
@@ -60,7 +60,6 @@ def run(args, run_id):
     lss=np.zeros((len(args.taskcla),len(args.taskcla)),dtype=np.float32)
 
     total_res = {}
-    memory = {}
     change = { 0: {} }
 
     for n,p in net.shared.named_parameters():
@@ -82,13 +81,10 @@ def run(args, run_id):
             if args.experiment == 'multidatasets':
                 args.lr_task = dataloader.lrs[t][1]
 
-            res_task = training_procedure(args, net, t, dataset[t], criterion, device, memory)
+            res_task = training_procedure(args, net, t, dataset[t], criterion, device)
             total_res[t] = res_task
             print('-'*150)
             print()
-
-            if args.use_memory:
-                memory[t] = set_memory(args, dataset[t]['train'], ncla)
 
             if args.get_masks:
                 change[t+1] = {}
@@ -130,7 +126,7 @@ def run(args, run_id):
 
     if args.get_masks:
         torch.save({ 'change_param': change, 'mean_mask': masks, 'args': args }, 
-                'masks/{}_{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18, args.use_meta))
+                'masks/{}_{}_{}_{}_{}_{}.pth'.format(args.experiment, run_id, args.meta_epochs, args.resnet18, args.use_meta, args.only_shared))
 
     # avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
     return avg_acc, gem_bwt, total_res

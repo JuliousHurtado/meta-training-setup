@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pickle
-import random
 
 import torch
 
@@ -137,19 +136,6 @@ def get_feature(net, task_id, dataloader, device):
         f_all['feats'].extend(feats.tolist())
 
     return f_all
-
-def set_memory(args, dataloader, ncla):
-    idxn = random.sample(range(len(dataloader.dataset)), args.mem_size*ncla)
-    
-    mem = []
-    for i in idxn:
-        elem = dataloader.dataset[i]
-        if args.resnet18:
-            mem.append(elem[2])
-        else:
-            mem.append(elem[0])
-
-    return mem
 
 def printSum(net, task_id):
     p_conv, p_lin, p_emb = 0, 0, 0

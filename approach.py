@@ -83,7 +83,7 @@ def test(net, task_id, dataloader, criterion, device, task_pri = None):
     net.train()
     return correct/total, loss/len(dataloader)
 
-def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device, use_memory):
+def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device):
     running_loss = 0.0
     net.train()
     inputs = batch[0].to(device)
@@ -97,7 +97,7 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri,
         if opti is not None:
             opti.zero_grad()
 
-        outs, _ = net(inputs, task_id, inputs_feats, True, task_pri, use_memory = use_memory)
+        outs, _ = net(inputs, task_id, inputs_feats, True, task_pri)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
@@ -115,11 +115,10 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri,
 
     return running_loss, correct/inputs.size(0)
 
-def meta_training(args, net, loader, task_id, opti_shared, criterion, device, memory):
+def meta_training(args, net, loader, task_id, opti_shared, criterion, device):
     grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
-    use_memory = False
     net#.to('cpu')
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net).to(device)
@@ -138,30 +137,14 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device, me
             iter_data_train = iter(loader)
             batch = next(iter_data_train)
 
-        # using memory
-        prob = random.uniform(0, 1)
-        if args.use_memory and prob < args.prob_use_mem and task_id > 0:
-            task_key = random.sample(memory.keys(), 1)[0]
+        batch_task_id = task_id
 
-            mem = []
-            for i in range(batch[0].size(0)):
-                idx_batch = random.sample(range(len(memory[task_key])), 1)[0]
-                mem.append(memory[task_key][idx_batch])
-
-            batch[2] = torch.stack(mem)
-            batch_task_id = task_key
-            use_memory = True
-
-        else:
-            batch_task_id = task_id
-            use_memory = False
-
-        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, batch_task_id, device, use_memory)
+        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, batch_task_id, device)
 
         loss_mini_task += temp_loss
         grads_acc['grads'].append(get_diff_weights(net, t_net))
        
-        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, batch_task_id, device, use_memory)
+        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, batch_task_id, device)
         grads_acc['acc'].append(acc_mini)
 
     # print(grads_acc['acc'])
@@ -210,7 +193,7 @@ def traditional_training(args, net, loader_train, val_loader, task_id, opti_shar
     #print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
     return correct/total, loss/len(loader_train), val_acc
 
-def training_procedure(args, net, task_id, dataloader, criterion, device, memory):
+def training_procedure(args, net, task_id, dataloader, criterion, device):
     results_val = []
 
     # Train input representation
@@ -229,6 +212,8 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
                     train_representation(args, net, dataloader, task_id, criterion, device)
                     mask_lr = args.lr_task
                 else:
+                    if args.use_pca:
+                        net.private.train_pca(dataloader['train'], task_id, device)
                     mask_lr = args.lr_task*0.1
             else:
                 mask_lr = args.lr_task*0.1
@@ -278,7 +263,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
         for e in range(args.meta_epochs):
             if args.use_meta:
                 opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.1) # *0.1, weight_decay=0.9 
-                meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
+                meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
             else:
                 opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
                 meta_acc, meta_loss, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared, criterion, device)
@@ -305,10 +290,3 @@ def training_procedure(args, net, task_id, dataloader, criterion, device, memory
     if args.test_every_epoch:
         torch.save({ 'args': args, 'result': results_val }, 
                 'results/{}_{}_{}_speed_of_training.pth'.format(args.experiment, task_id, args.only_shared))
-
-
-def train_extra(args, net, task_id, dataloader, criterion, device):
-    opti_shared_mask = optim.SGD(net.parameters(), args.lr_task, weight_decay=0.01, momentum=0.9)
-    acc_train, loss_train = trainShared(args, net, dataloader['train'], task_id, opti_shared_mask, criterion, net.forward, device)
-    acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-    print("Train Extra: Train loss: {:.4f} \t Acc Train: {:.4f} \t Acc Val: {:.4f}".format(loss_train, acc_train, acc_valid))
