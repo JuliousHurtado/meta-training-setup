@@ -174,6 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--mini-tasks', type=int, default=-1)
     parser.add_argument('--inner-loop', type=int, default=-1)
     parser.add_argument('--feats-epochs', type=int, default=50)
+    parser.add_argument('--meta-epochs', type=int, default=10)
 
     parser.add_argument('--num-masks', type=int, default=-1)
     parser.add_argument('--dist-masks', type=str, default='')
@@ -221,6 +222,7 @@ if __name__ == '__main__':
     if flags.test_every_epoch == 1:
         args.test_every_epoch = True
 
+    args.meta_epochs = flags.meta_epochs
 
 
     main(args)
