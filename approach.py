@@ -154,7 +154,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device):
     
     for i, g in enumerate(grads_acc['grads']):
         for n in g:
-            save_grads[n] += g[n].to(device)/(args.mini_tasks) # *weights[i]
+            save_grads[n] += g[n].to(device)*1/(args.mini_tasks) # weights[i]
 
     set_grads(net, save_grads, task_id)
 
@@ -259,17 +259,16 @@ def training_procedure(args, net, task_id, dataloader, criterion, device):
         args.meta_epochs = 1
         for p in net.head[task_id].parameters():
             params.append(p)
-    if args.train_meta:
-        for e in range(args.meta_epochs):
-            if args.use_meta:
-                opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.1) # *0.1, weight_decay=0.9 
-                meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
-            else:
-                opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
-                meta_acc, meta_loss, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared, criterion, device)
-                results_val.append(hist_val)
-            acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
-            print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f} Test Acc: {:.4f}\t".format(e+1,args.meta_epochs,meta_acc, meta_loss, acc_valid))
+    for e in range(args.meta_epochs):
+        if args.use_meta:
+            opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.1) # *0.1, weight_decay=0.9 
+            meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+        else:
+            opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
+            meta_acc, meta_loss, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared, criterion, device)
+            results_val.append(hist_val)
+        acc_valid, _ = test(net, task_id, dataloader['valid'], criterion, device)
+        print("[{}|{}]Meta Acc: {:.4f}\t Loss: {:.4f} Test Acc: {:.4f}\t".format(e+1,args.meta_epochs,meta_acc, meta_loss, acc_valid))
 
 
 

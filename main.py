@@ -14,6 +14,7 @@ from models.conv import Net
 from models.hat import HatNet
 from approach import test, training_procedure
 from utils import getMasks
+# from memory import add_new_dataset
 
 def run(args, run_id):
     # Args -- Experiment
@@ -68,9 +69,9 @@ def run(args, run_id):
 
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
-    args.train_f_representation = True
+    memory = None
+    # args.train_f_representation = True
     # args.pre_train_shared = True
-    args.train_meta = True
     for _ in range(args.num_iter):
         for t,ncla in args.taskcla:
             print('*'*150)
@@ -81,6 +82,8 @@ def run(args, run_id):
             if args.experiment == 'multidatasets':
                 args.lr_task = dataloader.lrs[t][1]
 
+            # mem_loader, memory = add_new_dataset(args, memory, t, dataloader, dataset[t]['train'].dataset)
+            # dataset[t]['memory'] = mem_loader
             res_task = training_procedure(args, net, t, dataset[t], criterion, device)
             total_res[t] = res_task
             print('-'*150)
@@ -115,7 +118,6 @@ def run(args, run_id):
         avg_acc, gem_bwt = utils.print_log_acc_bwt(args.taskcla, acc, lss, output_path=args.checkpoint, run_id=run_id)
         args.train_f_representation = False
         args.pre_train_shared = False
-        args.train_meta = False
 
     # for t1,ncla in args.taskcla:
     #     masks['test'][t1] = {}
