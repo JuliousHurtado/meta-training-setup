@@ -154,7 +154,7 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device):
     
     for i, g in enumerate(grads_acc['grads']):
         for n in g:
-            save_grads[n] += g[n].to(device)*1/(args.mini_tasks) # weights[i]
+            save_grads[n] += g[n].to(device)*(1-weights[i])/(args.mini_tasks) # 
 
     set_grads(net, save_grads, task_id)
 
