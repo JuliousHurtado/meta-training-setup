@@ -69,7 +69,7 @@ def run(args, run_id):
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
     args.train_f_representation = True
-    args.pre_train_shared = True
+    # args.pre_train_shared = True
     args.train_meta = True
     for _ in range(args.num_iter):
         for t,ncla in args.taskcla:
