@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pickle
+import random
 
 import torch
 
@@ -157,3 +158,16 @@ def printSum(net, task_id):
 
     print("Private -> Conv: {} , Linear: {} , Embedding: {}\nHead -> {}\nShared -> {}".format(p_conv, 
                         p_lin, p_emb, head, shared))
+
+def set_memory(args, dataloader, ncla):
+    idxn = random.sample(range(len(dataloader.dataset)), args.mem_size*ncla)
+    
+    mem = []
+    for i in idxn:
+        elem = dataloader.dataset[i]
+        if args.resnet18:
+            mem.append(elem[2])
+        else:
+            mem.append(elem[0])
+
+    return mem

@@ -83,7 +83,7 @@ def test(net, task_id, dataloader, criterion, device, task_pri = None):
     net.train()
     return correct/total, loss/len(dataloader)
 
-def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device):
+def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri, device, use_memory):
     running_loss = 0.0
     net.train()
     inputs = batch[0].to(device)
@@ -97,7 +97,7 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri,
         if opti is not None:
             opti.zero_grad()
 
-        outs, _ = net(inputs, task_id, inputs_feats, True, task_pri)
+        outs, _ = net(inputs, task_id, inputs_feats, True, task_pri, use_memory = use_memory)
         _, preds = torch.max(outs, 1)
 
         correct = preds.eq(labels.clone().view_as(preds)).sum().item()
@@ -115,10 +115,11 @@ def train_meta_batch(net, opti, criterion, batch, inner_loop, task_id, task_pri,
 
     return running_loss, correct/inputs.size(0)
 
-def meta_training(args, net, loader, task_id, opti_shared, criterion, device):
+def meta_training(args, net, loader, task_id, opti_shared, criterion, device, memory):
     grads_acc = {'grads': [], 'acc': []}
     loss_mini_task = 0.0
     total_loss = 0.0
+    use_memory = False
     net#.to('cpu')
     for k in range(args.mini_tasks):
         t_net = copy.deepcopy(net).to(device)
@@ -137,14 +138,32 @@ def meta_training(args, net, loader, task_id, opti_shared, criterion, device):
             iter_data_train = iter(loader)
             batch = next(iter_data_train)
 
+        # using memory
+        prob = random.uniform(0, 1)
+        if args.use_memory and prob < args.prob_use_mem and task_id > 0:
+            task_key = random.sample(memory.keys(), 1)[0]
+
+            mem = []
+            for i in range(batch[0].size(0)):
+                idx_batch = random.sample(range(len(memory[task_key])), 1)[0]
+                mem.append(memory[task_key][idx_batch])
+
+            batch[2] = torch.stack(mem)
+            batch_task_id = task_key
+            use_memory = True
+
+        else:
+            batch_task_id = task_id
+            use_memory = False
+
         batch_task_id = task_id
 
-        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, batch_task_id, device)
+        temp_loss, acc_mini = train_meta_batch(t_net, opti_shared_task, criterion, batch, args.inner_loop, task_id, batch_task_id, device, use_memory)
 
         loss_mini_task += temp_loss
         grads_acc['grads'].append(get_diff_weights(net, t_net))
        
-        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, batch_task_id, device)
+        _, acc_mini= train_meta_batch(t_net, None, None, batch, 1, task_id, batch_task_id, device, use_memory)
         grads_acc['acc'].append(acc_mini)
 
     # print(grads_acc['acc'])
@@ -193,7 +212,7 @@ def traditional_training(args, net, loader_train, val_loader, task_id, opti_shar
     #print("[{}|{}]Pre Acc: {:.4f}".format(e+1,args.feats_epochs,correct/total))
     return correct/total, loss/len(loader_train), val_acc
 
-def training_procedure(args, net, task_id, dataloader, criterion, device):
+def training_procedure(args, net, task_id, dataloader, criterion, device, memory):
     results_val = []
 
     # Train input representation
@@ -262,7 +281,7 @@ def training_procedure(args, net, task_id, dataloader, criterion, device):
     for e in range(args.meta_epochs):
         if args.use_meta:
             opti_shared = optim.SGD(params, args.lr_meta*0.1, weight_decay=0.1) # *0.1, weight_decay=0.9 
-            meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device)
+            meta_acc, meta_loss = meta_training(args, net, dataloader['train'], task_id, opti_shared, criterion, device, memory)
         else:
             opti_shared = optim.SGD(params, args.lr_meta, weight_decay=0.1) # 
             meta_acc, meta_loss, hist_val = traditional_training(args, net, dataloader['train'], dataloader['valid'], task_id, opti_shared, criterion, device)

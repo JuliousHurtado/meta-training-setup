@@ -13,7 +13,7 @@ import utils
 from models.conv import Net
 from models.hat import HatNet
 from approach import test, training_procedure
-from utils import getMasks
+from utils import getMasks, set_memory
 # from memory import add_new_dataset
 
 def run(args, run_id):
@@ -61,6 +61,8 @@ def run(args, run_id):
     lss=np.zeros((len(args.taskcla),len(args.taskcla)),dtype=np.float32)
 
     total_res = {}
+    memory = {}
+    memory_masks = {}
     change = { 0: {} }
 
     for n,p in net.shared.named_parameters():
@@ -84,18 +86,21 @@ def run(args, run_id):
 
             # mem_loader, memory = add_new_dataset(args, memory, t, dataloader, dataset[t]['train'].dataset)
             # dataset[t]['memory'] = mem_loader
-            res_task = training_procedure(args, net, t, dataset[t], criterion, device)
+            res_task = training_procedure(args, net, t, dataset[t], criterion, device, memory)
             total_res[t] = res_task
             print('-'*150)
             print()
 
-            if args.get_masks:
-                change[t+1] = {}
-                for n,p in net.shared.named_parameters():
-                    change[t+1][n] = p.to('cpu') - change[0][n]
+            if args.use_memory:
+                memory[t] = set_memory(args, dataset[t]['train'], ncla)
 
-                masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
-            #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
+            # if args.get_masks:
+            #     change[t+1] = {}
+            #     for n,p in net.shared.named_parameters():
+            #         change[t+1][n] = p.to('cpu') - change[0][n]
+
+            #     masks['train'][t] = getMasks(net, t, dataset[t]['train'], device)
+            # #     feats['train'][t] = get_feature(net, t, dataset[t]['train'], device)
 
             for u in range(t+1):
                 if args.use_last_pri:
