@@ -71,7 +71,7 @@ def run(args, run_id):
 
     masks = {'train': {}, 'test': {}}
     feats = {'train': {}, 'test': {}}
-    memory = None
+    # memory = None
     # args.train_f_representation = True
     # args.pre_train_shared = True
     for _ in range(args.num_iter):
