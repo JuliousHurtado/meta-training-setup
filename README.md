@@ -18,7 +18,7 @@ The motivation behind this flow of information is that MARK learns to reuse info
 
 To encourage the reuse of knowledge, we must find knowledge that can be relevant across tasks. MARK uses a metalearning strategy that improves the ability to generalize to future tasks
 
-For more details, please read the paper.
+More details in the paper.
 
 ## Code
 
