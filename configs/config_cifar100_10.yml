@@ -41,9 +41,11 @@ use_mask: True
 only_shared: False
 
 # Memory
-use_memory: False
-prob_use_mem: 0.5
+use_memory: True
+prob_use_mem: 0.2
 mem_size: 5
+
+perc_current_task_mem: 0.1
 
 # Use last private model to get masks
 use_last_pri: False
@@ -52,3 +54,5 @@ use_last_pri: False
 get_masks: False
 use_one_representation: False
 save_model: False
+pre_train_shared: True
+train_f_representation: True
