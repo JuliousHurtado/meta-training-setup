@@ -13,7 +13,7 @@ num_iter: 1
 
 #Train
 epochs: 70
-feats_epochs: 40 #20
+feats_epochs: 50 #20
 meta_epochs: 10
 batch_size: 128
 pc_valid: 0.02
