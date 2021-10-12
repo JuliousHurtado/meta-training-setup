@@ -30,8 +30,7 @@ where "./configs_file.yml" is the corresponding configuration file. For example,
 
     python main.py --config ./configs/config_cifar100.yml
 
-In the configuration files (.yml), one can change the conditions of the experiments. For example, change the number of epochs, change the F<sup>t</sup> function 
-(Random, resnet or Task), or even the components we want to use (Meta-Learning, Mask or both).
+In the configuration files (.yml), we change the hyperparameters of the experiments. For example, the number of epochs, if using or not Meta-Learning or Mask Functions, using a pre-trained Resnet as F<sup>t</sup>, etc.
 
 If you have any questions, do not hesitate to write // Si tienes alguna pregunta, no dudes en escribirme.
 
