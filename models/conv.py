@@ -68,7 +68,6 @@ class Private(nn.Module):
         self.dim_embedding = args.latent_dim
         self.num_tasks = args.ntasks
         self.one_representation = args.use_one_representation
-        self.use_pca = False
 
         if args.use_one_representation:
             self.num_tasks = 1
@@ -82,10 +81,6 @@ class Private(nn.Module):
 
             self.num_ftrs = resnet18.fc.in_features
             # assert False, self.feat_extraction
-
-            if args.use_pca:
-                self.use_pca = True
-                self.rank_matrix = {}
 
         else:
             if args.experiment == 'cifar100':
@@ -152,13 +147,10 @@ class Private(nn.Module):
             else:
                 x = self.conv[task_id](x)
 
-        if self.use_pca:
-            for i in range(self.layers):
-                m.append([torch.matmul(x, self.rank_matrix[task_id][:, :self.hiddens[i]]).unsqueeze(2).unsqueeze(3)])
-        else:
-            for i in range(self.layers):
-                film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
-                m.append([
+
+        for i in range(self.layers):
+            film_vector = self.linear[task_id][i](x.clone()).view(x.size(0), 1, self.hiddens[i])
+            m.append([
                     film_vector[:,0,:].unsqueeze(2).unsqueeze(3),
                     ])
 
@@ -222,11 +214,11 @@ class Net(nn.Module):
                 ))
 
 
-    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None, use_memory = False):
+    def forward(self, x, task_id, inputs_feats, shared_clf = False, task_pri = None):
         if self.only_shared:
             m_p = None
         else:
-            if use_memory or self.args.resnet18:
+            if self.args.resnet18:
                 x_p = inputs_feats
             else:
                 x_p = x.clone()

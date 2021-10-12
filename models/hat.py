@@ -2,8 +2,7 @@ import sys
 import torch
 import numpy as np
 
-def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
-    return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
+import utils
 
 class HatNet(torch.nn.Module):
 
@@ -14,13 +13,13 @@ class HatNet(torch.nn.Module):
         self.taskcla=taskcla
 
         self.c1=torch.nn.Conv2d(ncha,64,kernel_size=size//8)
-        s=compute_conv_output_size(size,size//8)
+        s=utils.compute_conv_output_size(size,size//8)
         s=s//2
         self.c2=torch.nn.Conv2d(64,128,kernel_size=size//10)
-        s=compute_conv_output_size(s,size//10)
+        s=utils.compute_conv_output_size(s,size//10)
         s=s//2
         self.c3=torch.nn.Conv2d(128,256,kernel_size=2)
-        s=compute_conv_output_size(s,2)
+        s=utils.compute_conv_output_size(s,2)
         s=s//2
         self.smid=s
         self.maxpool=torch.nn.MaxPool2d(2)
@@ -52,10 +51,9 @@ class HatNet(torch.nn.Module):
 
         return
 
-    def forward(self,x,t,s=1):
-        s=1
+    def forward(self,t,x,s=1):
         # Gates
-        masks=self.mask(torch.tensor(t),s=s)
+        masks=self.mask(t,s=s)
         gc1,gc2,gc3,gfc1,gfc2=masks
         # Gated
         h=self.maxpool(self.drop1(self.relu(self.c1(x))))
@@ -69,12 +67,10 @@ class HatNet(torch.nn.Module):
         h=h*gfc1.expand_as(h)
         h=self.drop2(self.relu(self.fc2(h)))
         h=h*gfc2.expand_as(h)
-        # y=[]
-        # for i,_ in self.taskcla:
-        #     y.append(self.last[i](h))
-        # return y,masks
-
-        return self.last[t](h), 0
+        y=[]
+        for i,_ in self.taskcla:
+            y.append(self.last[i](h))
+        return y,masks
 
     def mask(self,t,s=1):
         gc1=self.gate(s*self.ec1(t))
