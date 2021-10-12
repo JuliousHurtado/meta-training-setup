@@ -10,7 +10,7 @@ When learning tasks over time, artificial neural networks suffer from a problem 
 
 A schematic view of our proposal is described in the following image:
 
-![MARK](/images/mark_architecture.png)
+![MARK](/mark_architecture.png)
 
 The flow of information in MARK is as follows. Input X<sub>i</sub> goes into F<sup>t</sup> to extract the representation F<sup>t</sup><sub>i</sub>. This representation is then used by M<sup>t</sup> to produce the set of masks that condition each of the blocks in the KB. The same input X<sub>i</sub> enters the mask-conditioned KB leading to vector F<sup>t</sup><sub>i,KB</sub> used by the classification head. Finally, classifier C<sup>t</sup> generates the model prediction, where *t* is the task ID associated to input X<sub>i</sub>.
 
@@ -30,7 +30,7 @@ where "./configs_file.yml" is the corresponding configuration file. For example,
 
     python main.py --config ./configs/config_cifar100.yml
 
-In the configuration files (.yml), one can change the conditions of the experiments. For example, change the number of epochs, change the F^t function 
+In the configuration files (.yml), one can change the conditions of the experiments. For example, change the number of epochs, change the F<sup>t</sup> function 
 (Random, resnet or Task), or even the components we want to use (Meta-Learning, Mask or both).
 
 If you have any questions, do not hesitate to write // Si tienes alguna pregunta, no dudes en escribirme.
