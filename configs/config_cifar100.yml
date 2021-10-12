@@ -14,7 +14,7 @@ seed: 48
 
 #Train
 epochs: 70
-feats_epochs: 20
+feats_epochs: 40
 meta_epochs: 10
 batch_size: 128
 pc_valid: 0.15
@@ -24,9 +24,9 @@ lr_task: 0.1
 #Model
 head_units: 64
 latent_dim: 128
-resnet18: False
+resnet18: True
 resnet_pre_trained: True
-task_embedding: False
+use_pca: True
 
 #Meta
 use_meta: True
@@ -35,8 +35,6 @@ inner_loop: 40
 
 # #Modelo Completo:
 use_share: True
-con_pri_shd: False
-use_private: True
 use_mask: True
 only_shared: False
 
@@ -52,3 +50,6 @@ use_last_pri: False
 get_masks: False
 use_one_representation: False
 save_model: False
+pre_train_shared: True
+random_f: False
+test_every_epoch: False
