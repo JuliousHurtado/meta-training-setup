@@ -11,12 +11,12 @@ ntasks: 20
 n_channels: 3
 workers: 4
 seed: 48
+num_iter: 1
 
 #Train
 epochs: 70
-feats_epochs: 20 #20
+feats_epochs: 40 #20
 meta_epochs: 10
-epochs_inner_task: 1
 batch_size: 128
 pc_valid: 0.02
 lr_meta: 0.001 #0.001 
@@ -25,17 +25,17 @@ lr_task: 0.01
 #Model
 head_units: 128
 latent_dim: 256
-resnet18: False
-task_embedding: False
+resnet18: True
+use_relu: False
+use_pca: True
 
 #Meta
-use_meta: False #
-mini_tasks: 30 #80
-inner_loop: 30 #75
+use_meta: True #
+mini_tasks: 10 #80
+inner_loop: 40 #75
 
 # #Modelo Completo:
 use_share: True
-use_private: True
 use_mask: True
 only_shared: False
 
@@ -48,6 +48,9 @@ mem_size: 5
 use_last_pri: False
 
 #Extra
-get_masks: False
+get_masks: True
 use_one_representation: False
 save_model: False
+pre_train_shared: True
+random_f: False
+test_every_epoch: False
